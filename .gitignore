@@ -1,0 +1,14 @@
+# OS and tools
+.DS_Store
+
+# IDE
+.idea/
+
+# Rust
+target/
+
+
+
+# Added by cargo
+
+/target

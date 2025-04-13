@@ -1,0 +1,28 @@
+[package]
+name = "komrad-lang"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+
+[workspace]
+resolver = "3"
+members = [ "crates/komrad-cli","crates/komrad-core", "crates/komrad-parser", "crates/komrad-runtime"]
+
+[workspace.dependencies]
+async-trait = "0.1.88"
+dashmap = "7.0.0-rc2"
+indexmap = "2.9.0"
+miette = { version = "7.5.0", features = ["fancy"] }
+nom = "8.0.0"
+nom_locate = "5.0.0"
+serde = { version = "1.0", features = ["derive", "std", "rc", "alloc"] }
+serde_json = "1.0"
+thiserror = "2.0.12"
+tokio = { version = "1.44.2", features=["full"] }
+tokio-stream = { version = "0.1.17", features = ["full"] }
+tokio-tungstenite = { version = "0.26.2", features = ["stream", "handshake", "url"] }
+tokio-util = { version = "0.7.11", features = ["full"] }
+tracing = "0.1.41"
+tracing-subscriber = { version = "0.3.19", features = ["env-filter", "local-time"] }
+uuid = { version = "1.16.0", features = ["v7", "serde", "fast-rng"] }
