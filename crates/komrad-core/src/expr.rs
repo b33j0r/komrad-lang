@@ -115,7 +115,7 @@ pub enum Type {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
     /// A literal or direct value (e.g. number, string, boolean, block, etc.)
-    Value(Value),
+    Value(Spanned<Value>),
 
     /// Send that evaluates to a reply value (e.g., `target ? value`).
     Ask {
@@ -252,7 +252,7 @@ mod tests {
     #[test]
     fn test_spanned_construction() {
         let span = Span { file_id: 1, start: 0, end: 5 };
-        let expr = Expr::Value(Value::Int(42));
+        let expr = Expr::Value(Spanned::new(span.clone(), Value::Int(10)));
         let sp_expr = Spanned::new(span.clone(), expr.clone());
         assert_eq!(sp_expr.span, span);
         assert_eq!(*sp_expr, expr);

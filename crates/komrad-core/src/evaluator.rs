@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 use async_trait::async_trait;
-use crate::expr::{Expr, Operator, RuntimeError, Value};
+use crate::expr::{Expr, Operator, RuntimeError, Spanned, Value};
 
 pub struct EvaluationContext {
     env: PhantomData<()>,
@@ -29,7 +29,12 @@ impl Evaluate for Expr {
 
     async fn evaluate(&self, context: &mut EvaluationContext) -> Value {
         match self {
-            Expr::Value(v) => v.clone(),
+            Expr::Value(Spanned { value: box Value::Word(name), span }) => {
+                Value::Error(RuntimeError::ArgumentError(format!("Undefined variable: {}", name)).as_spanned(
+                    span.clone()
+                ))
+            }
+            Expr::Value(Spanned { box value, .. }) => value.clone(),
             Expr::List { elements } => {
                 let mut evaluated_elements = Vec::with_capacity(elements.len());
                 for elem in elements {
@@ -45,30 +50,30 @@ impl Evaluate for Expr {
                     box Operator::Add => match (left_val, right_val) {
                         (Value::Int(a), Value::Int(b)) => Value::Int(a + b),
                         _ => Value::Error(RuntimeError::ArgumentError("Type mismatch in addition".to_string()).as_spanned(
-                            op.span.clone()
+                            rhs.span.clone()
                         )),
                     },
                     box Operator::Subtract => match (left_val, right_val) {
                         (Value::Int(a), Value::Int(b)) => Value::Int(a - b),
                         _ => Value::Error(RuntimeError::ArgumentError("Type mismatch in subtraction".to_string()).as_spanned(
-                            op.span.clone()
+                            rhs.span.clone()
                         )),
                     },
                     box Operator::Multiply => match (left_val, right_val) {
                         (Value::Int(a), Value::Int(b)) => Value::Int(a * b),
                         _ => Value::Error(RuntimeError::ArgumentError("Type mismatch in multiplication".to_string()).as_spanned(
-                            op.span.clone()
+                            rhs.span.clone()
                         )),
                     },
                     box Operator::Divide => match (left_val, right_val) {
                         (Value::Int(_), Value::Int(0)) => Value::Error(
                             RuntimeError::ArgumentError("Divide by zero".to_string()).as_spanned(
-                                op.span.clone()
+                                rhs.span.clone()
                             )
                         ),
                         (Value::Int(a), Value::Int(b)) => Value::Int(a / b),
                         _ => Value::Error(RuntimeError::ArgumentError("Type mismatch in division".to_string()).as_spanned(
-                            op.span.clone()
+                            rhs.span.clone()
                         )),
                     },
                     _ => Value::Error(RuntimeError::UnknownError("Unknown operator".to_string()).as_spanned(
@@ -113,7 +118,10 @@ mod tests {
     #[tokio::test]
     async fn test_evaluate_value() {
         let mut context = &mut EvaluationContext { env: PhantomData };
-        let expr = Expr::Value(Value::Int(10));
+        let expr = Expr::Value(Spanned {
+            value: Box::new(Value::Int(10)),
+            span: Span { file_id: 1, start: 0, end: 0 },
+        });
         let result = expr.evaluate(&mut context).await;
         match result {
             Value::Int(n) => assert_eq!(n, 10),
@@ -128,11 +136,17 @@ mod tests {
             elements: vec![
                 Spanned::new(
                     Span { file_id: 1, start: 0, end: 0 },
-                    Expr::Value(Value::Int(1)),
+                    Expr::Value(Spanned {
+                        value: Box::new(Value::Int(1)),
+                        span: Span { file_id: 1, start: 0, end: 0 },
+                    }),
                 ),
                 Spanned::new(
                     Span { file_id: 1, start: 1, end: 1 },
-                    Expr::Value(Value::Int(2)),
+                    Expr::Value(Spanned {
+                        value: Box::new(Value::Int(2)),
+                        span: Span { file_id: 1, start: 1, end: 1 },
+                    }),
                 ),
             ],
         };
@@ -153,7 +167,10 @@ mod tests {
         let expr = Expr::BinaryExpr {
             lhs: Spanned::new(
                 Span { file_id: 1, start: 0, end: 0 },
-                Expr::Value(Value::Int(2)),
+                Expr::Value(Spanned {
+                    value: Box::new(Value::Int(2)),
+                    span: Span { file_id: 1, start: 0, end: 0 },
+                }),
             ),
             op: Spanned::new(
                 Span { file_id: 1, start: 1, end: 1 },
@@ -161,7 +178,10 @@ mod tests {
             ),
             rhs: Spanned::new(
                 Span { file_id: 1, start: 2, end: 2 },
-                Expr::Value(Value::Int(3)),
+                Expr::Value(Spanned {
+                    value: Box::new(Value::Int(3)),
+                    span: Span { file_id: 1, start: 2, end: 2 },
+                }),
             ),
         };
         let result = expr.evaluate(&mut context).await;
@@ -178,7 +198,10 @@ mod tests {
         let expr = Expr::BinaryExpr {
             lhs: Spanned::new(
                 Span { file_id: 1, start: 0, end: 0 },
-                Expr::Value(Value::Int(10)),
+                Expr::Value(Spanned {
+                    value: Box::new(Value::Int(10)),
+                    span: Span { file_id: 1, start: 0, end: 0 },
+                }),
             ),
             op: Spanned::new(
                 Span { file_id: 1, start: 1, end: 1 },
@@ -186,7 +209,10 @@ mod tests {
             ),
             rhs: Spanned::new(
                 Span { file_id: 1, start: 2, end: 2 },
-                Expr::Value(Value::Int(0)),
+                Expr::Value(Spanned {
+                    value: Box::new(Value::Int(0)),
+                    span: Span { file_id: 1, start: 2, end: 2 },
+                }),
             ),
         };
         let result = expr.evaluate(&mut context).await;
@@ -208,20 +234,30 @@ mod tests {
                     elements: vec![
                         Spanned::new(
                             Span { file_id: 1, start: 0, end: 0 },
-                            Expr::Value(Value::Int(10)),
+                            Expr::Value(Spanned {
+                                value: Box::new(Value::Int(10)),
+                                span: Span { file_id: 1, start: 0, end: 0 },
+                            }),
                         ),
                         Spanned::new(
                             Span { file_id: 1, start: 1, end: 1 },
-                            Expr::Value(Value::Int(20)),
+                            Expr::Value(Spanned {
+                                value: Box::new(Value::Int(20)),
+                                span: Span { file_id: 1, start: 1, end: 1 },
+                            }),
                         ),
                     ],
                 },
             ),
             index: Spanned::new(
                 Span { file_id: 1, start: 2, end: 2 },
-                Expr::Value(Value::Int(1)),
+                Expr::Value(Spanned {
+                    value: Box::new(Value::Int(1)),
+                    span: Span { file_id: 1, start: 2, end: 2 },
+                })
             ),
         };
+
         let result = expr.evaluate(&mut context).await;
         match result {
             Value::Int(n) => assert_eq!(n, 20),
@@ -239,18 +275,31 @@ mod tests {
                     elements: vec![
                         Spanned::new(
                             Span { file_id: 1, start: 0, end: 0 },
-                            Expr::Value(Value::Int(10)),
+                            Expr::Value(
+                                Spanned::new(
+                                    Span { file_id: 1, start: 0, end: 0 },
+                                    Value::Int(10)
+                                )
+                            ),
                         ),
                         Spanned::new(
                             Span { file_id: 1, start: 1, end: 1 },
-                            Expr::Value(Value::Int(20)),
+                            Expr::Value(Spanned::new(
+                                Span { file_id: 1, start: 1, end: 1 },
+                                Value::Int(20)
+                            )),
                         ),
                     ],
                 },
             ),
             index: Spanned::new(
                 Span { file_id: 1, start: 2, end: 2 },
-                Expr::Value(Value::Int(5)),
+                Expr::Value(
+                    Spanned::new(
+                        Span { file_id: 1, start: 2, end: 2 },
+                        Value::Int(5)
+                    )
+                ),
             ),
         };
         let result = expr.evaluate(&mut context).await;
