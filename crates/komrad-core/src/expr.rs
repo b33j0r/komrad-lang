@@ -1,4 +1,5 @@
 use std::ops::{Deref, DerefMut};
+use std::sync::Arc;
 use thiserror::Error;
 
 pub enum TopLevel {
@@ -12,6 +13,12 @@ pub struct Span {
     pub file_id: usize,
     pub start: usize,
     pub end: usize,
+}
+
+impl Default for Span {
+    fn default() -> Self {
+        Span { file_id: 0, start: 0, end: 0 }
+    }
 }
 
 /// A convenience wrapper to keep track of a node along with its source location.
@@ -98,7 +105,7 @@ pub enum Value {
     Float(f64),
     Uuid(uuid::Uuid),
     /// Represents a sequence of statements, often used as a closure or handler body.
-    Block(Block),
+    Block(Arc<Block>),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -147,28 +154,24 @@ pub enum Expr {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Statement {
-    /// Evaluates an expression without binding the result (e.g. `expr;`).
+    /// Evaluates an expression without binding the result (e.g. `123` -> `123`).
     Expr(Expr),
 
-    /// Binds the value of an expression to a target (e.g. `let x = expr;`).
+    /// Binds the value of an expression to a target.
     Assign {
         target: Spanned<AssignmentTarget>,
         type_name: Option<Spanned<Type>>,
         value: Spanned<Expr>,
     },
 
-    /// Send that does not evaluate to a reply value (e.g., `target ! value;`).
+    /// Send that does not evaluate to a reply value.
     Tell {
         target: Spanned<Expr>,
         value: Spanned<Expr>,
     },
 
     /// A block with a pattern-based handler within an assignment statement (or top-level).
-    Handler {
-        /// e.g. `[a 2 _b _(x>3) _{c}] => expression`
-        pattern: Spanned<Pattern>,
-        handler: Spanned<Expr>,
-    },
+    Handler(Handler),
 
     /// Turns a list into a call or a block into an evaluated result
     Expand {
@@ -177,6 +180,12 @@ pub enum Statement {
 
     /// A block that is invalid or was parsed incorrectly.
     InvalidBlock,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Handler {
+    pub pattern: Spanned<Pattern>,
+    pub expr: Spanned<Expr>,
 }
 
 /// Represents the target of an assignment.
@@ -244,6 +253,43 @@ pub enum Pattern {
     List(Vec<Spanned<Pattern>>),
 }
 
+impl Pattern {
+    #[cfg(test)]
+    pub(crate) fn new_word(word: String) -> Spanned<Pattern> {
+        Spanned::new(
+            Span { file_id: 0, start: 0, end: word.len() },
+            Pattern::VariableCapture(word)
+        )
+    }
+
+    #[cfg(test)]
+    pub(crate) fn new_block_capture(name: String) -> Spanned<Pattern> {
+        Spanned::new(
+            Span { file_id: 0, start: 0, end: name.len() },
+            Pattern::BlockCapture(name)
+        )
+    }
+
+    #[cfg(test)]
+    pub(crate) fn new_predicate_capture(pred: Predicate) -> Spanned<Pattern> {
+        Spanned::new(
+            Span { file_id: 0, start: 0, end: 1 },
+            Pattern::PredicateCapture(Spanned::new(
+                Span { file_id: 0, start: 0, end: 1 },
+                pred
+            ))
+        )
+    }
+
+    #[cfg(test)]
+    pub(crate) fn new_list(patterns: Vec<Spanned<Pattern>>) -> Spanned<Pattern> {
+        Spanned::new(
+            Span { file_id: 0, start: 0, end: 1 },
+            Pattern::List(patterns)
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::expr::{Block, Pattern, Span, Spanned, Statement};
@@ -266,7 +312,7 @@ mod tests {
                 Statement::InvalidBlock
             )
         ]);
-        let val = Value::Block(block);
+        let val = Value::Block(Arc::new(block));
         match val {
             Value::Block(b) => {
                 assert_eq!(b.0.len(), 1);
