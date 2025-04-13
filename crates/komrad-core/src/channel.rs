@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use tokio::sync::{mpsc, Mutex};
-use crate::expr::{RuntimeError, Value};
+use crate::ast::{RuntimeError, Value};
 
 const CHANNEL_CAPACITY_MSG: usize = 64;
 const CHANNEL_CAPACITY_CTL: usize = 8;
@@ -12,7 +12,49 @@ pub struct Message {
     pub reply_to: Option<Channel>,
 }
 
-enum ControlMessage {
+impl Default for Message {
+    fn default() -> Self {
+        Message {
+            uuid: uuid::Uuid::now_v7(),
+            value: Value::Null,
+            reply_to: None,
+        }
+    }
+}
+
+impl Message {
+    pub fn new(value: Value, reply_to: Option<Channel>) -> Self {
+        Message {
+            uuid: uuid::Uuid::now_v7(),
+            value,
+            reply_to,
+        }
+    }
+
+    pub fn with_terms(mut self, terms: Vec<Value>) -> Self {
+        if !terms.is_empty() {
+            self.value = Value::List(terms);
+        } else {
+            self.value = Value::Null;
+        }
+        self
+    }
+
+    pub fn with_reply_to(mut self, reply_to: Channel) -> Self {
+        self.reply_to = Some(reply_to);
+        self
+    }
+
+    pub fn value(&self) -> &Value {
+        &self.value
+    }
+
+    pub fn reply_to(&self) -> Option<&Channel> {
+        self.reply_to.as_ref()
+    }
+}
+
+pub enum ControlMessage {
     Stop,
 }
 
@@ -60,16 +102,19 @@ impl Channel {
         let _ = self.sender_ctl.send(ControlMessage::Stop).await;
     }
 
-    pub async fn send(&self, value: Value) {
+    pub async fn send(&self, value: Value) -> Result<(), RuntimeError> {
         let msg = Message {
             uuid: uuid::Uuid::now_v7(),
             value,
             reply_to: None,
         };
-        let _ = self.sender_msg.send(msg).await;
+        match self.sender_msg.send(msg).await {
+            Ok(_) => Ok(()),
+            Err(_) => Err(RuntimeError::ChannelError("Channel closed".to_string()))
+        }
     }
 
-    pub async fn send_and_recv(&self, value: Value) -> Value {
+    pub async fn send_and_recv(&self, value: Value) -> Result<Value, RuntimeError> {
         let (reply_channel, mut listener) = Channel::new();
         let msg = Message {
             uuid: uuid::Uuid::now_v7(),
@@ -79,7 +124,8 @@ impl Channel {
         let _ = self.sender_msg.send(msg).await;
 
         match listener.recv().await {
-            Message { value, .. } => value,
+            Ok(msg) => Ok(msg.value),
+            Err(e) => Err(e),
         }
     }
 }
@@ -90,26 +136,32 @@ impl ChannelListener {
     }
 
     /// Because this uses a mutex, it should only be used from a single async task.
-    pub async fn recv(&self) -> Message {
+    pub async fn recv(&self) -> Result<Message, RuntimeError> {
         let mut receiver = self.receiver_msg.lock().await;
         match receiver.recv().await {
-            Some(msg) => msg,
+            Some(msg) => Ok(msg),
             None => {
-                panic!("ChannelListener: No message received");
+                Err(RuntimeError::ChannelError("Channel closed".to_string()))
             }
         }
     }
 
     /// Because this uses a mutex, it should only be used from a single async task.
-    pub async fn recv_ctl(&self) -> Option<ControlMessage> {
-        self.receiver_ctl.lock().await.recv().await
+    pub async fn recv_ctl(&self) -> Result<ControlMessage, RuntimeError> {
+        let mut receiver = self.receiver_ctl.lock().await;
+        match receiver.recv().await {
+            Some(msg) => Ok(msg),
+            None => {
+                Err(RuntimeError::ChannelError("Control channel closed".to_string()))
+            }
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::expr::Value;
+    use crate::ast::Value;
 
     #[tokio::test]
     async fn test_channel_send_recv() {
@@ -117,9 +169,9 @@ mod tests {
         let value = Value::String("Hello, World!".to_string());
         channel.send(value.clone()).await;
         let mut listener = listener.clone();
-        match listener.recv().await.value {
-            Value::String(msg) => assert_eq!(msg, "Hello, World!".to_string()),
-            _ => panic!("Expected a string message"),
+        match listener.recv().await {
+            Ok(msg) => assert_eq!(msg.value, value),
+            Err(_) => panic!("Expected to receive the message"),
         }
     }
 
@@ -134,18 +186,28 @@ mod tests {
         tokio::spawn(async move {
             let mut listener = listener1.clone();
             match listener.recv().await {
-                Message { value, reply_to: Some(reply_channel), .. } => {
-                    reply_channel.send(Value::String("Reply from channel 2!".to_string())).await;
+                Ok(msg) => {
+                    if let Some(reply_to) = msg.reply_to {
+                        reply_to.send(Value::String("Reply from channel 2!".to_string())).await.unwrap();
+                    }
                 }
-                Message { uuid: _, value: _, reply_to: None } => {
-                    panic!("Expected a reply channel");
-                }
+                Err(_) => panic!("Expected to receive the message"),
             }
         });
 
         match channel1.send_and_recv(value.clone()).await {
-            Value::String(msg) => assert_eq!(msg, "Reply from channel 2!"),
-            _ => panic!("Expected a string reply"),
+            Ok(response) => assert_eq!(response, Value::String("Reply from channel 2!".to_string())),
+            Err(_) => panic!("Expected to receive the response"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_channel_stop() {
+        let (channel, listener) = Channel::new();
+        channel.stop().await;
+        match listener.recv_ctl().await {
+            Ok(ControlMessage::Stop) => assert!(true),
+            _ => panic!("Expected to receive stop control message"),
         }
     }
 }

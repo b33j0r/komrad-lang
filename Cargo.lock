@@ -158,6 +158,19 @@ name = "komrad-lang"
 version = "0.1.0"
 
 [[package]]
+name = "komrad-macros"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "indexmap",
+ "komrad-core",
+ "proc-macro2",
+ "quote",
+ "syn",
+ "tokio",
+]
+
+[[package]]
 name = "komrad-parser"
 version = "0.1.0"
 

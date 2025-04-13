@@ -1,9 +1,10 @@
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 use thiserror::Error;
+use crate::Channel;
 
 pub enum TopLevel {
-    Expr(Expr),
+    Statement(Statement),
     Block(Block),
 }
 
@@ -23,7 +24,7 @@ impl Default for Span {
 
 /// A convenience wrapper to keep track of a node along with its source location.
 #[derive(Debug, Clone, PartialEq)]
-pub struct Spanned<T, S=Span> {
+pub struct Spanned<T, S = Span> {
     pub span: S,
     pub value: Box<T>,
 }
@@ -108,6 +109,98 @@ pub enum Value {
     Block(Arc<Block>),
 }
 
+impl From<Channel> for Value {
+    fn from(c: Channel) -> Self {
+        Value::Channel(c)
+    }
+}
+
+impl From<&str> for Value {
+    fn from(s: &str) -> Self {
+        Value::String(s.to_string())
+    }
+}
+
+impl From<String> for Value {
+    fn from(s: String) -> Self {
+        Value::String(s)
+    }
+}
+
+impl From<i64> for Value {
+    fn from(i: i64) -> Self {
+        Value::Int(i)
+    }
+}
+
+impl From<f64> for Value {
+    fn from(f: f64) -> Self {
+        Value::Float(f)
+    }
+}
+
+impl From<bool> for Value {
+    fn from(b: bool) -> Self {
+        Value::Boolean(b)
+    }
+}
+
+impl TryFrom<Value> for bool {
+    type Error = RuntimeError;
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        match value {
+            Value::Boolean(b) => Ok(b),
+            _ => Err(RuntimeError::TypeError("Expected a boolean".to_string())),
+        }
+    }
+}
+
+impl TryFrom<Value> for i64 {
+    type Error = RuntimeError;
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        match value {
+            Value::Int(i) => Ok(i),
+            _ => Err(RuntimeError::TypeError("Expected an integer".to_string())),
+        }
+    }
+}
+
+impl TryFrom<Value> for f64 {
+    type Error = RuntimeError;
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        match value {
+            Value::Float(f) => Ok(f),
+            _ => Err(RuntimeError::TypeError("Expected a float".to_string())),
+        }
+    }
+}
+
+
+impl TryFrom<Value> for String {
+    type Error = RuntimeError;
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        match value {
+            Value::String(s) => Ok(s),
+            _ => Err(RuntimeError::TypeError("Expected a string".to_string())),
+        }
+    }
+}
+
+impl TryFrom<Value> for Channel {
+    type Error = RuntimeError;
+
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        match value {
+            Value::Channel(c) => Ok(c),
+            _ => Err(RuntimeError::TypeError("Expected a channel".to_string())),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Type {
     Null,
@@ -170,10 +263,10 @@ pub enum Statement {
         value: Spanned<Expr>,
     },
 
-    /// A block with a pattern-based handler within an assignment statement (or top-level).
-    Handler(Handler),
+    /// A pattern/expr pair
+    Handler(Arc<Handler>),
 
-    /// Turns a list into a call or a block into an evaluated result
+    /// Turns a list into a call or a block into an evaluated result in the outer scope.
     Expand {
         target: Spanned<Expr>,
     },
@@ -182,6 +275,7 @@ pub enum Statement {
     InvalidBlock,
 }
 
+/// Represents a handler with a pattern and an expression.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Handler {
     pub pattern: Spanned<Pattern>,
@@ -258,7 +352,7 @@ impl Pattern {
     pub(crate) fn new_word(word: String) -> Spanned<Pattern> {
         Spanned::new(
             Span { file_id: 0, start: 0, end: word.len() },
-            Pattern::VariableCapture(word)
+            Pattern::VariableCapture(word),
         )
     }
 
@@ -266,7 +360,7 @@ impl Pattern {
     pub(crate) fn new_block_capture(name: String) -> Spanned<Pattern> {
         Spanned::new(
             Span { file_id: 0, start: 0, end: name.len() },
-            Pattern::BlockCapture(name)
+            Pattern::BlockCapture(name),
         )
     }
 
@@ -276,8 +370,8 @@ impl Pattern {
             Span { file_id: 0, start: 0, end: 1 },
             Pattern::PredicateCapture(Spanned::new(
                 Span { file_id: 0, start: 0, end: 1 },
-                pred
-            ))
+                pred,
+            )),
         )
     }
 
@@ -285,14 +379,14 @@ impl Pattern {
     pub(crate) fn new_list(patterns: Vec<Spanned<Pattern>>) -> Spanned<Pattern> {
         Spanned::new(
             Span { file_id: 0, start: 0, end: 1 },
-            Pattern::List(patterns)
+            Pattern::List(patterns),
         )
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::expr::{Block, Pattern, Span, Spanned, Statement};
+    use crate::ast::{Block, Pattern, Span, Spanned, Statement};
     use super::*;
 
     #[test]
@@ -316,7 +410,7 @@ mod tests {
         match val {
             Value::Block(b) => {
                 assert_eq!(b.0.len(), 1);
-            },
+            }
             _ => panic!("Expected Value::Block"),
         }
     }

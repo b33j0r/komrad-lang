@@ -1,15 +1,16 @@
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 use async_trait::async_trait;
-use crate::expr::{Expr, Operator, RuntimeError, Spanned, Value};
+use crate::env::Env;
+use crate::ast::{Expr, Operator, RuntimeError, Spanned, Value};
 
 pub struct EvaluationContext {
-    env: PhantomData<()>,
+    env: Env,
 }
 
 impl Default for EvaluationContext {
     fn default() -> Self {
-        EvaluationContext { env: PhantomData }
+        EvaluationContext { env: Env::default() }
     }
 }
 
@@ -112,12 +113,12 @@ impl Evaluate for Expr {
 
 #[cfg(test)]
 mod tests {
-    use crate::expr::{Span, Spanned};
+    use crate::ast::{Span, Spanned};
     use super::*;
 
     #[tokio::test]
     async fn test_evaluate_value() {
-        let mut context = &mut EvaluationContext { env: PhantomData };
+        let mut context = &mut EvaluationContext::default();
         let expr = Expr::Value(Spanned {
             value: Box::new(Value::Int(10)),
             span: Span { file_id: 1, start: 0, end: 0 },
@@ -131,7 +132,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_evaluate_list() {
-        let mut context = &mut EvaluationContext { env: PhantomData };
+        let mut context = &mut EvaluationContext::default();
         let expr = Expr::List {
             elements: vec![
                 Spanned::new(
@@ -163,7 +164,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_evaluate_binary_add() {
-        let mut context = &mut EvaluationContext { env: PhantomData };
+        let mut context = &mut EvaluationContext::default();
         let expr = Expr::BinaryExpr {
             lhs: Spanned::new(
                 Span { file_id: 1, start: 0, end: 0 },
@@ -194,7 +195,7 @@ mod tests {
     // Change the pattern matching in the test function to expect a boxed error
     #[tokio::test]
     async fn test_evaluate_binary_divide_by_zero() {
-        let mut context = &mut EvaluationContext { env: PhantomData };
+        let mut context = &mut EvaluationContext::default();
         let expr = Expr::BinaryExpr {
             lhs: Spanned::new(
                 Span { file_id: 1, start: 0, end: 0 },
@@ -226,7 +227,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_evaluate_slice_expr() {
-        let mut context = &mut EvaluationContext { env: PhantomData };
+        let mut context = &mut EvaluationContext::default();
         let expr = Expr::SliceExpr {
             target: Spanned::new(
                 Span { file_id: 1, start: 0, end: 0 },
@@ -267,7 +268,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_evaluate_slice_expr_out_of_bounds_get_simulated_spanned_info() {
-        let mut context = &mut EvaluationContext { env: PhantomData };
+        let mut context = &mut EvaluationContext::default();
         let expr = Expr::SliceExpr {
             target: Spanned::new(
                 Span { file_id: 1, start: 0, end: 0 },

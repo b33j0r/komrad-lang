@@ -1,0 +1,18 @@
+[package]
+name = "komrad-macros"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+proc-macro = true
+
+
+[dependencies]
+komrad-core = { path = "../komrad-core" }
+
+async-trait.workspace = true
+proc-macro2 = { version = "1.0.94", features = ["nightly"] }
+quote = { version = "1.0.24", features = [] }
+syn = "2.0.100"
+tokio.workspace = true
+indexmap.workspace = true

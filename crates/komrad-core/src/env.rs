@@ -2,7 +2,7 @@ use indexmap::IndexMap;
 use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use crate::expr::{Handler, Value};
+use crate::ast::{Handler, Value};
 
 pub struct Env {
     scope_stack: VecDeque<Arc<Scope>>,
@@ -169,7 +169,7 @@ impl Default for Scope {
 mod tests {
     use super::*;
     use std::collections::HashMap;
-    use crate::expr::{Block, Expr, Pattern, Spanned, Value};
+    use crate::ast::{Block, Expr, Pattern, Spanned, Value};
 
     #[tokio::test]
     async fn test_env() {
@@ -200,8 +200,8 @@ mod tests {
         let block = Block(Vec::new());
         let block_value = Value::Block(Arc::new(block));
         let spanned_value = Spanned::new(
-            crate::expr::Span::default(),
-            Expr::Value(Spanned::new(crate::expr::Span::default(), block_value)),
+            crate::ast::Span::default(),
+            Expr::Value(Spanned::new(crate::ast::Span::default(), block_value)),
         );
         let handler = Handler {
             pattern: Pattern::new_word("foo".to_string()),
@@ -233,9 +233,9 @@ mod tests {
         env.push_handler(Handler {
             pattern: Pattern::new_word("foo".to_string()),
             expr: Spanned::new(
-                crate::expr::Span::default(),
+                crate::ast::Span::default(),
                 Expr::Value(Spanned::new(
-                    crate::expr::Span::default(),
+                    crate::ast::Span::default(),
                     Value::Int(100)
                 )),
             ),

@@ -7,7 +7,7 @@ edition = "2024"
 
 [workspace]
 resolver = "3"
-members = [ "crates/komrad-cli","crates/komrad-core", "crates/komrad-parser", "crates/komrad-runtime"]
+members = [ "crates/komrad-cli","crates/komrad-core", "crates/komrad-macros", "crates/komrad-parser", "crates/komrad-runtime"]
 
 [workspace.dependencies]
 async-trait = "0.1.88"
