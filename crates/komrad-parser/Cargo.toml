@@ -4,3 +4,13 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+komrad-core = { path = "../komrad-core" }
+
+nom.workspace = true
+nom_locate.workspace = true
+miette.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+glob = "0.3.2"
+tempfile = "3.19.1"

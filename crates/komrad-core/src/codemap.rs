@@ -16,6 +16,7 @@ pub struct Context {
 /// Used by nom for span tracking
 pub type ParserSpan<'a> = LocatedSpan<&'a str, Context>;
 
+
 impl<'a> From<ParserSpan<'a>> for Span {
     fn from(span: ParserSpan) -> Self {
         let start = span.location_offset();

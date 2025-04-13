@@ -1,13 +1,12 @@
 // parser.rs
 
-use crate::ast::{Expr, ParseError, Statement};
-use crate::codemap::{CodeMaps, ParserSpan};
-use crate::{Operator, Span, Spanned, Value};
+use komrad_core::{CodeMaps, ParserSpan};
+use komrad_core::{Expr, ParseError, Statement};
+use komrad_core::{Operator, Span, Spanned, Value};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::character::complete::{line_ending, multispace0, not_line_ending, space0};
 use nom::combinator::{map, opt};
-use nom::error::{FromExternalError, ParseError as NomParseError};
 use nom::multi::{many1, separated_list0};
 use nom::sequence::{delimited, preceded};
 use nom::{Err as NomErr, IResult, Parser};
@@ -17,45 +16,6 @@ use std::path::PathBuf;
 // PResult type alias.
 // --------------------------------------------
 pub type PResult<'a, T> = IResult<ParserSpan<'a>, T, ParseError>;
-
-// --------------------------------------------
-// Implement nom::error::ParseError for your ParseError.
-// --------------------------------------------
-impl NomParseError<ParserSpan<'_>> for ParseError {
-    fn from_error_kind(input: ParserSpan, kind: nom::error::ErrorKind) -> Self {
-        ParseError::Nom {
-            kind,
-            span: Span::from(input),
-        }
-    }
-
-    fn append(input: ParserSpan, kind: nom::error::ErrorKind, other: Self) -> Self {
-        other.append(kind, &Span::from(input))
-    }
-
-    fn or(self, _other: Self) -> Self {
-        self
-    }
-}
-
-impl FromExternalError<ParserSpan<'_>, ParseError> for ParseError {
-    fn from_external_error(
-        input: ParserSpan<'_>,
-        _kind: nom::error::ErrorKind,
-        e: ParseError,
-    ) -> Self {
-        e.with_span(&Span::from(input))
-    }
-}
-
-impl ParseError {
-    pub fn from_nom_error(e: nom::error::Error<ParserSpan<'_>>) -> Self {
-        ParseError::Nom {
-            kind: e.code,
-            span: Span::from(e.input),
-        }
-    }
-}
 
 // --------------------------------------------
 // The spanned(...) helper.

@@ -1,4 +1,6 @@
+use crate::codemap::ParserSpan;
 use crate::Channel;
+use nom::error::{FromExternalError, ParseError as NomParseError};
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 use thiserror::Error;
@@ -82,6 +84,45 @@ pub enum ParseError {
         message: String,
         span: Span,
     },
+}
+
+// --------------------------------------------
+// Implement nom::error::ParseError for your ParseError.
+// --------------------------------------------
+impl NomParseError<ParserSpan<'_>> for ParseError {
+    fn from_error_kind(input: ParserSpan, kind: nom::error::ErrorKind) -> Self {
+        ParseError::Nom {
+            kind,
+            span: Span::from(input),
+        }
+    }
+
+    fn append(input: ParserSpan, kind: nom::error::ErrorKind, other: Self) -> Self {
+        other.append(kind, &Span::from(input))
+    }
+
+    fn or(self, _other: Self) -> Self {
+        self
+    }
+}
+
+impl FromExternalError<ParserSpan<'_>, ParseError> for ParseError {
+    fn from_external_error(
+        input: ParserSpan<'_>,
+        _kind: nom::error::ErrorKind,
+        e: ParseError,
+    ) -> Self {
+        e.with_span(&Span::from(input))
+    }
+}
+
+impl ParseError {
+    pub fn from_nom_error(e: nom::error::Error<ParserSpan<'_>>) -> Self {
+        ParseError::Nom {
+            kind: e.code,
+            span: Span::from(e.input),
+        }
+    }
 }
 
 impl ParseError {
