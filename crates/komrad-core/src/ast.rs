@@ -1,7 +1,7 @@
+use crate::Channel;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 use thiserror::Error;
-use crate::Channel;
 
 pub enum TopLevel {
     Statement(Statement),
@@ -16,6 +16,7 @@ pub struct Span {
     pub end: usize,
 }
 
+#[cfg(test)]
 impl Default for Span {
     fn default() -> Self {
         Span { file_id: 0, start: 0, end: 0 }
@@ -39,6 +40,16 @@ impl<T> Spanned<T> {
     }
 }
 
+pub trait AsSpanned<T> {
+    fn as_spanned(self, span: Span) -> Spanned<T>;
+}
+
+impl<T> AsSpanned<T> for T {
+    fn as_spanned(self, span: Span) -> Spanned<T> {
+        Spanned::new(span, self)
+    }
+}
+
 impl<T> Deref for Spanned<T> {
     type Target = T;
 
@@ -54,7 +65,52 @@ impl<T> DerefMut for Spanned<T> {
 }
 
 #[derive(Debug, Clone, Error, PartialEq)]
+pub enum ParseError {
+    // Variant for nom-style errors
+    #[error("Nom error: {kind:?} at {span:?}")]
+    Nom {
+        kind: nom::error::ErrorKind,
+        span: Span,
+    },
+    // Incomplete input error
+    #[error("Incomplete input: {remaining}")]
+    Incomplete { remaining: String, span: Span },
+    // Error when a number cannot be parsed
+    #[error("Invalid number: {value}")]
+    InvalidNumber {
+        value: String,
+        message: String,
+        span: Span,
+    },
+}
+
+impl ParseError {
+    /// Attaches a new span to the error.
+    /// This method “replaces” the span in the error with the provided one.
+    pub fn with_span(mut self, span: &Span) -> Self {
+        match &mut self {
+            ParseError::Nom { span: s, .. } => *s = span.clone(),
+            ParseError::Incomplete { span: s, .. } => *s = span.clone(),
+            ParseError::InvalidNumber { span: s, .. } => *s = span.clone(),
+        }
+        self
+    }
+
+    /// Appends additional error context by creating a new Nom error.
+    pub fn append(self, kind: nom::error::ErrorKind, span: &Span) -> Self {
+        // For simplicity, we return a new Nom error variant.
+        ParseError::Nom {
+            kind,
+            span: span.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Error, PartialEq)]
 pub enum RuntimeError {
+    #[error("Parse error: {0}")]
+    ParseError(#[from] ParseError),
+
     #[error("Syntax error: {0}")]
     SyntaxError(String),
 
@@ -78,12 +134,6 @@ pub enum RuntimeError {
 
     #[error("Channel error: {0}")]
     ChannelError(String),
-}
-
-impl RuntimeError {
-    pub(crate) fn as_spanned(&self, span: Span) -> Spanned<RuntimeError> {
-        Spanned::new(span, self.clone())
-    }
 }
 
 /// A simple wrapper for a series of statements, each possibly with its own span.
@@ -386,8 +436,8 @@ impl Pattern {
 
 #[cfg(test)]
 mod tests {
-    use crate::ast::{Block, Pattern, Span, Spanned, Statement};
     use super::*;
+    use crate::ast::{Block, Pattern, Span, Spanned, Statement};
 
     #[test]
     fn test_spanned_construction() {

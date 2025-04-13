@@ -1,6 +1,7 @@
 use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 use async_trait::async_trait;
+use crate::AsSpanned;
 use crate::env::Env;
 use crate::ast::{Expr, Operator, RuntimeError, Spanned, Value};
 
@@ -101,7 +102,7 @@ impl Evaluate for Expr {
                                 index.span.clone()
                             ))
                         }
-                    },
+                    }
                     _ => Value::Error(RuntimeError::ArgumentError("Type mismatch in slice".to_string()).as_spanned(
                         index.span.clone()
                     )),
@@ -255,7 +256,7 @@ mod tests {
                 Expr::Value(Spanned {
                     value: Box::new(Value::Int(1)),
                     span: Span { file_id: 1, start: 2, end: 2 },
-                })
+                }),
             ),
         };
 
@@ -298,7 +299,7 @@ mod tests {
                 Expr::Value(
                     Spanned::new(
                         Span { file_id: 1, start: 2, end: 2 },
-                        Value::Int(5)
+                        Value::Int(5),
                     )
                 ),
             ),
