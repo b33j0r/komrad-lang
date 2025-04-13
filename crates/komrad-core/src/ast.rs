@@ -228,7 +228,6 @@ impl TryFrom<Value> for f64 {
     }
 }
 
-
 impl TryFrom<Value> for String {
     type Error = RuntimeError;
 
@@ -297,6 +296,10 @@ pub enum Expr {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Statement {
+    BlankLine,
+
+    Comment(String),
+
     /// Evaluates an expression without binding the result (e.g. `123` -> `123`).
     Expr(Expr),
 
