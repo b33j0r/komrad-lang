@@ -269,7 +269,12 @@ pub mod parser_tests {
     /// Helper: Given the source code as a &str, create a new CodeMaps and parse a file.
     fn parse_complete(source: &str) -> Result<Vec<Spanned<Statement>>, ParseError> {
         let mut codemaps = CodeMaps::new();
-        parse_file_complete(&mut codemaps, source, None)
+        parse_file_complete(&mut codemaps, source, None).map(
+            |top| match top {
+                TopLevel::Block(block) => block.0,
+                _ => vec![],
+            },
+        )
     }
 
     #[test]
