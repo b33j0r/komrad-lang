@@ -86,19 +86,19 @@ impl LogFormatter for MyLogFormatter {
             log::Level::Warn => Color::LightMagenta,
             log::Level::Error => Color::LightRed,
         };
-        // textwrap::wrap(evt.msg(), width).iter().map(|line| {
-        //     let span = ratatui::prelude::Span::styled(
-        //         line.to_string(),
-        //         Style::default().fg(color),
-        //     );
-        //     Line::from(span)
-        // }).collect()
-
-        let span = ratatui::prelude::Span::styled(
-            evt.msg().to_string(),
-            Style::default().fg(color),
-        );
-        vec![Line::from(span)]
+        textwrap::wrap(evt.msg(), width).iter().map(|line| {
+            let span = ratatui::prelude::Span::styled(
+                line.to_string(),
+                Style::default().fg(color),
+            );
+            Line::from(span)
+        }).collect()
+        //
+        // let span = ratatui::prelude::Span::styled(
+        //     evt.msg().to_string(),
+        //     Style::default().fg(color),
+        // );
+        // vec![Line::from(span)]
     }
 }
 
