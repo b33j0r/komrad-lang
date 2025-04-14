@@ -1,5 +1,5 @@
-use crate::Channel;
 use crate::codemap::ParserSpan;
+use crate::Channel;
 use nom::error::{FromExternalError, ParseError as NomParseError};
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
@@ -349,7 +349,6 @@ pub enum Statement {
     /// Binds the value of an expression to a target.
     Assign {
         target: Spanned<AssignmentTarget>,
-        type_name: Option<Spanned<Type>>,
         value: Spanned<Expr>,
     },
 

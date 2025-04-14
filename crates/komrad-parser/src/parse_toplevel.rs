@@ -1,14 +1,14 @@
 // parse_toplevel
 
-use komrad_core::{Block, CodeAtlas, ParserSpan, TopLevel};
+use komrad_core::{AssignmentTarget, Block, CodeAtlas, ParserSpan, TopLevel};
 use komrad_core::{Expr, ParseError, Statement};
 use komrad_core::{Operator, Span, Spanned, Value};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
-use nom::character::complete::{line_ending, multispace0, not_line_ending, space0};
+use nom::character::complete::{alpha1, line_ending, multispace0, not_line_ending, space0};
 use nom::combinator::{map, opt};
-use nom::multi::{many1, separated_list0};
-use nom::sequence::{delimited, preceded};
+use nom::multi::{many0, many1, separated_list0};
+use nom::sequence::{delimited, pair, preceded};
 use nom::{Err as NomErr, IResult, Parser};
 use std::path::PathBuf;
 
@@ -122,21 +122,88 @@ fn parse_statements(input: ParserSpan) -> PResult<Vec<Spanned<Statement>>> {
         separated_list0(many1(preceded(opt(space0), line_ending)), parse_statement),
         multispace0,
     )
-    .map(|stmts| {
-        stmts
-            .into_iter()
-            .filter(|s| !matches!(*s.value, Statement::BlankLine))
-            .collect()
-    })
-    .parse(input)
+        .map(|stmts| {
+            stmts
+                .into_iter()
+                .filter(|s| !matches!(*s.value, Statement::BlankLine))
+                .collect()
+        })
+        .parse(input)
 }
 
 fn parse_statement(input: ParserSpan) -> PResult<Spanned<Statement>> {
     preceded(
         space0,
-        alt((parse_expr_statement, parse_blank_line, parse_comment_line)),
+        alt((parse_assignment_statement, parse_expr_statement, parse_blank_line, parse_comment_line)),
     )
-    .parse(input)
+        .parse(input)
+}
+
+/// Assignment statement: parse an assignment and return it as a Statement.
+fn parse_assignment_statement(input: ParserSpan) -> PResult<Spanned<Statement>> {
+    spanned(|i| {
+        pair(
+            parse_assignment_target,
+            preceded(preceded(space0, parse_tag("=")), preceded(space0, parse_expression)),
+        ).map(
+            |(target, expr)| {
+                Statement::Assign {
+                    target,
+                    value: expr,
+                }
+            }
+        ).parse(i)
+    })
+        .parse(input)
+}
+
+/// Assignment target: parse an identifier and return it as a Value::Word.
+fn parse_assignment_target(input: ParserSpan) -> PResult<Spanned<AssignmentTarget>> {
+    spanned(|i| {
+        alt((
+            parse_identifier.map(|sp_val| {
+                AssignmentTarget::Variable(sp_val)
+            }),
+        )).parse(i)
+    })
+        .parse(input)
+}
+
+#[cfg(test)]
+mod assignment_tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_assignment() {
+        let input = "x = 42";
+        let mut codemaps = CodeAtlas::new();
+        let initial_span = codemaps.add_file(input, None);
+        let result = parse_assignment_statement(initial_span);
+
+        assert!(result.is_ok(), "Failed to parse assignment: {:?}", result);
+
+        let (remaining, assignment) = result.unwrap();
+        assert_eq!(remaining.fragment().to_string(), "");
+
+        if let Statement::Assign { target, value, .. } = *assignment.value {
+            if let AssignmentTarget::Variable(var) = *target.value {
+                assert_eq!(var, "x");
+            } else {
+                panic!("Expected a variable assignment");
+            }
+            if let Expr::Value(ref sp_val) = *value.value {
+                if let Value::Int(i) = *sp_val.value {
+                    assert_eq!(i, 42);
+                } else {
+                    panic!("Expected an integer value");
+                }
+            } else {
+                panic!("Expected a value expression");
+            }
+        } else {
+            panic!("Expected an assignment statement");
+        }
+    }
 }
 
 /// Comment line: parse a comment starting with '#' and consume all characters
@@ -151,7 +218,7 @@ fn parse_comment_line(input: ParserSpan) -> PResult<Spanned<Statement>> {
         // Create the Comment statement.
         Ok((i, Statement::Comment(comment_text.fragment().to_string())))
     })
-    .parse(input)
+        .parse(input)
 }
 
 /// Blank line: simply consume the line and return a Statement::BlankLine.
@@ -160,7 +227,7 @@ fn parse_blank_line(input: ParserSpan) -> PResult<Spanned<Statement>> {
         let (i, _) = line_ending(i)?;
         Ok((i, Statement::BlankLine))
     })
-    .parse(input)
+        .parse(input)
 }
 
 /// Expression statement: simply parse an expression and wrap it as a Statement.
@@ -170,7 +237,7 @@ fn parse_expr_statement(input: ParserSpan) -> PResult<Spanned<Statement>> {
         let (i, expr) = parse_expression(i)?;
         Ok((i, Statement::Expr(*expr.value)))
     })
-    .parse(input)
+        .parse(input)
 }
 
 // --------------------------------------------
@@ -181,23 +248,23 @@ pub fn parse_expression(input: ParserSpan) -> PResult<Spanned<Expr>> {
 }
 
 /// Either a binary expression or a simple expression.
-fn parse_expression_inner(input: ParserSpan) -> IResult<ParserSpan, Spanned<Expr>, ParseError> {
+fn parse_expression_inner(input: ParserSpan) -> PResult<Spanned<Expr>> {
     alt((parse_binary_expression, parse_expr_toplevel)).parse(input)
 }
 
 /// A toplevel expression (number or identifier) is wrapped into Expr::Value.
-fn parse_expr_toplevel(input: ParserSpan) -> IResult<ParserSpan, Spanned<Expr>, ParseError> {
+fn parse_expr_toplevel(input: ParserSpan) -> PResult<Spanned<Expr>> {
     alt((
         parse_number.map(|sp_val| Spanned::new(sp_val.span.clone(), Expr::Value(sp_val))),
-        parse_identifier.map(|sp_val| Spanned::new(sp_val.span.clone(), Expr::Value(sp_val))),
+        parse_identifier_value.map(|sp_val| Spanned::new(sp_val.span.clone(), Expr::Value(sp_val))),
     ))
-    .parse(input)
+        .parse(input)
 }
 
 /// Minimal binary expression: `expr operator expr`.
 /// The overall span of the binary expression is the range from the start of the left
 /// sub-expression to the end of the right sub-expression.
-fn parse_binary_expression(input: ParserSpan) -> IResult<ParserSpan, Spanned<Expr>, ParseError> {
+fn parse_binary_expression(input: ParserSpan) -> PResult<Spanned<Expr>> {
     let start = input.clone();
     let (i, left) = (parse_expr_toplevel).parse(input)?;
     let (i, op) = delimited(space0, parse_binary_operator, space0).parse(i)?;
@@ -237,9 +304,9 @@ fn parse_binary_operator(input: ParserSpan) -> IResult<ParserSpan, Spanned<Opera
             map(parse_tag(">"), |_| Operator::GreaterThan),
             map(parse_tag("<"), |_| Operator::LessThan),
         ))
-        .parse(i)
+            .parse(i)
     })
-    .parse(input)
+        .parse(input)
 }
 
 // --------------------------------------------
@@ -259,18 +326,38 @@ fn parse_number(input: ParserSpan) -> IResult<ParserSpan, Spanned<Value>, ParseE
         })?;
         Ok((i, Value::Int(val_i64)))
     })
-    .parse(input)
+        .parse(input)
 }
 
-fn parse_identifier(input: ParserSpan) -> IResult<ParserSpan, Spanned<Value>, ParseError> {
+fn parse_identifier(input: ParserSpan) -> IResult<ParserSpan, String, ParseError> {
+    // an alpha or underscore followed by alphanum or underscore or hyphen
+    (
+        alpha1,
+        many0(alt((
+            alpha1,
+            parse_tag("_"),
+            parse_tag("-"),
+        ))),
+    ).map(
+        |(first, rest): (ParserSpan, Vec<ParserSpan>)| {
+            let mut id = first.fragment().to_string();
+            for s in rest {
+                id.push_str(s.fragment());
+            }
+            id
+        },
+    ).parse(input)
+}
+
+fn parse_identifier_value(input: ParserSpan) -> IResult<ParserSpan, Spanned<Value>, ParseError> {
     spanned(|i| {
-        let (i, _) = space0(i)?;
-        let (i, ident_span) =
-            nom::bytes::complete::take_while1(|c: char| c.is_alphanumeric() || c == '_')(i)?;
-        let word = ident_span.fragment().to_string();
-        Ok((i, Value::Word(word)))
+        parse_identifier.map(
+            |s: String| {
+                Value::Word(s)
+            }
+        ).parse(i)
     })
-    .parse(input)
+        .parse(input)
 }
 
 #[cfg(test)]

@@ -300,11 +300,9 @@ impl ToSExpr for Statement {
             Expr(e) => SExpr::List(vec![SExpr::Atom("ExprStmt".to_string()), e.to_sexpr()]),
             Assign {
                 target,
-                type_name,
                 value,
             } => {
                 let mut vec = vec![SExpr::Atom("Assign".to_string()), target.to_sexpr()];
-                vec.push(type_name.to_sexpr());
                 vec.push(value.to_sexpr());
                 SExpr::List(vec)
             }
@@ -491,7 +489,7 @@ fn parse_list(input: SParserSpan) -> SResult<SExpr> {
         ),
         char(')'),
     )
-    .parse(input)
+        .parse(input)
 }
 
 /// Parse a double-quoted string. Basic escapes: \" \\ \n \r \t
