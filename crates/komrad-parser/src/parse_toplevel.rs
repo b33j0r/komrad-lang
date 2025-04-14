@@ -7,7 +7,7 @@ use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::character::complete::{alpha1, line_ending, multispace0, not_line_ending, space0};
 use nom::combinator::{map, opt};
-use nom::multi::{many0, many1, separated_list0};
+use nom::multi::{many0, many1, separated_list0, separated_list1};
 use nom::sequence::{delimited, pair, preceded};
 use nom::{Err as NomErr, IResult, Parser};
 use std::path::PathBuf;
@@ -134,8 +134,67 @@ fn parse_statements(input: ParserSpan) -> PResult<Vec<Spanned<Statement>>> {
 fn parse_statement(input: ParserSpan) -> PResult<Spanned<Statement>> {
     preceded(
         space0,
-        alt((parse_assignment_statement, parse_expr_statement, parse_blank_line, parse_comment_line)),
+        alt((
+            parse_assignment_statement,
+            parse_tell_statement,
+            parse_expr_statement,
+            parse_blank_line,
+            parse_comment_line
+        )),
     )
+        .parse(input)
+}
+
+fn parse_tell_statement(input: ParserSpan) -> PResult<Spanned<Statement>> {
+    // like `bob something 42 + 3 ok`
+    spanned(|i| {
+        pair(parse_call_target, preceded(space0, parse_call_args))
+            .map(|(target, args)| {
+                Statement::Tell {
+                    target,
+                    value: args,
+                }
+            })
+            .parse(i)
+    }).parse(input)
+}
+
+fn parse_call_target(input: ParserSpan) -> PResult<Spanned<Expr>> {
+    spanned(|i| {
+        alt((
+            parse_identifier_value.map(|sp_val| {
+                Expr::Value(sp_val)
+            }),
+        )).parse(i)
+    })
+        .parse(input)
+}
+
+fn parse_call_args(input: ParserSpan) -> PResult<Spanned<Expr>> {
+    // like `something 42 + 3 ok` as an Expr::List
+    spanned(|i| {
+        separated_list1(space0, parse_call_arg).map(
+            |args| {
+                Expr::List {
+                    elements: args
+                }
+            }
+        ).parse(i)
+    })
+        .parse(input)
+}
+
+fn parse_call_arg(input: ParserSpan) -> PResult<Spanned<Expr>> {
+    spanned(|i| {
+        alt((
+            parse_number_value.map(|sp_val| {
+                Expr::Value(sp_val)
+            }),
+            parse_identifier_value.map(|sp_val| {
+                Expr::Value(sp_val)
+            }),
+        )).parse(i)
+    })
         .parse(input)
 }
 
@@ -255,7 +314,7 @@ fn parse_expression_inner(input: ParserSpan) -> PResult<Spanned<Expr>> {
 /// A toplevel expression (number or identifier) is wrapped into Expr::Value.
 fn parse_expr_toplevel(input: ParserSpan) -> PResult<Spanned<Expr>> {
     alt((
-        parse_number.map(|sp_val| Spanned::new(sp_val.span.clone(), Expr::Value(sp_val))),
+        parse_number_value.map(|sp_val| Spanned::new(sp_val.span.clone(), Expr::Value(sp_val))),
         parse_identifier_value.map(|sp_val| Spanned::new(sp_val.span.clone(), Expr::Value(sp_val))),
     ))
         .parse(input)
@@ -313,7 +372,7 @@ fn parse_binary_operator(input: ParserSpan) -> IResult<ParserSpan, Spanned<Opera
 // Number and Identifier parsers.
 // They return Spanned<Value> which we later wrap into an Expr.
 // --------------------------------------------
-fn parse_number(input: ParserSpan) -> IResult<ParserSpan, Spanned<Value>, ParseError> {
+fn parse_number_value(input: ParserSpan) -> IResult<ParserSpan, Spanned<Value>, ParseError> {
     spanned(|i| {
         let (i, digits) = parse_digit1(i)?;
         let s = digits.fragment();
@@ -421,7 +480,7 @@ pub mod parser_tests {
                 panic!("Expected a value expression");
             }
         } else {
-            panic!("Expected an expression statement");
+            panic!("Expected an expression statement got {:?}", *stmt);
         }
 
         // Check span text.
