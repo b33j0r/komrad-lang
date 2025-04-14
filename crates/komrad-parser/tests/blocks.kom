@@ -4,11 +4,7 @@ X = {
 	b foo bar
 }
 ----
-(Block
-	(Assign (Variable "X") (Value
-		(Block
-			(Assign (Variable "a") (Value 123))
-			(Tell (Value b) (List (Value foo) (Value bar)))
-		)
-	))
-)
+(Block (Assign (Variable X) (Block
+	(Assign (Variable a) 123)
+	(Tell b (List foo bar)))
+))

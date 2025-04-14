@@ -217,7 +217,7 @@ impl ToSExpr for Expr {
     fn to_sexpr(&self) -> SExpr {
         use Expr::*;
         match self {
-            Value(v) => SExpr::List(vec![SExpr::Atom("Value".to_string()), v.to_sexpr()]),
+            Value(v) => v.to_sexpr(),
             Ask { target, value } => SExpr::List(vec![
                 SExpr::Atom("Ask".to_string()),
                 target.to_sexpr(),
@@ -297,7 +297,7 @@ impl ToSExpr for Statement {
         match self {
             BlankLine => SExpr::Atom("BlankLine".to_string()),
             Comment(s) => SExpr::List(vec![SExpr::Atom("Comment".to_string()), s.to_sexpr()]),
-            Expr(e) => SExpr::List(vec![SExpr::Atom("ExprStmt".to_string()), e.to_sexpr()]),
+            Expr(e) => e.to_sexpr(),
             Assign {
                 target,
                 value,
@@ -347,14 +347,16 @@ impl ToSExpr for AssignmentTarget {
     fn to_sexpr(&self) -> SExpr {
         use AssignmentTarget::*;
         match self {
-            Variable(s) => SExpr::List(vec![SExpr::Atom("Variable".to_string()), s.to_sexpr()]),
+            Variable(s) => SExpr::List(vec![SExpr::Atom("Variable".to_string()), SExpr::Atom(
+                s.to_string(),
+            )]),
             Slice { target, index } => SExpr::List(vec![
                 SExpr::Atom("Slice".to_string()),
                 target.to_sexpr(),
                 index.to_sexpr(),
             ]),
             List { elements } => {
-                let mut vec = vec![SExpr::Atom("AssignmentList".to_string())];
+                let mut vec = vec![SExpr::Atom("List".to_string())];
                 for elem in elements {
                     vec.push(elem.to_sexpr());
                 }

@@ -1,0 +1,5 @@
+==== destructure variables
+[a b c] = [1 2 3]
+
+----
+(Block (Assign (List (Variable a) (Variable b) (Variable c)) (List 1 2 3)))

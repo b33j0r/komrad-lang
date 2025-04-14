@@ -1,0 +1,24 @@
+==== list empty
+[]
+
+----
+(Block (List))
+
+
+==== list with one item
+[1]
+
+----
+(Block (List 1))
+
+==== list with two items
+[1 2]
+
+----
+(Block (List 1 2))
+
+==== assign to list
+a = [1 2]
+
+----
+(Block (Assign (Variable a) (List 1 2)))

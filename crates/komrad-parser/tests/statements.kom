@@ -16,11 +16,11 @@
 a = 1 + 2
 
 ----
-(Block (Comment "This is a comment") (Assign (Variable "a") (BinaryExpr (Value 1) + (Value 2))))
+(Block (Comment "This is a comment") (Assign (Variable a) (BinaryExpr 1 + 2)))
 
 
 ==== comment and a tell
 # This is a comment
 a b c
 ----
-(Block (Comment "This is a comment") (Tell (Value a) (List (Value b) (Value c))))
+(Block (Comment "This is a comment") (Tell a (List b c)))

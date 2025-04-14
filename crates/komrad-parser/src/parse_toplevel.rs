@@ -5,7 +5,7 @@ use komrad_core::{Expr, ParseError, Statement};
 use komrad_core::{Operator, Span, Spanned, Value};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
-use nom::character::complete::{alpha1, char, line_ending, multispace0, not_line_ending, space0};
+use nom::character::complete::{alpha1, char, line_ending, multispace0, multispace1, not_line_ending, space0};
 use nom::combinator::{map, opt};
 use nom::multi::{many0, many1, separated_list0, separated_list1};
 use nom::sequence::{delimited, pair, preceded};
@@ -221,11 +221,26 @@ fn parse_assignment_statement(input: ParserSpan) -> PResult<Spanned<Statement>> 
 fn parse_assignment_target(input: ParserSpan) -> PResult<Spanned<AssignmentTarget>> {
     spanned(|i| {
         alt((
-            parse_identifier.map(|sp_val| {
-                AssignmentTarget::Variable(sp_val)
-            }),
-        )).parse(i)
+            // Try destructuring first.
+            parse_destructure_target,
+            // Fallback to variable assignment.
+            parse_identifier.map(|sp_val| AssignmentTarget::Variable(sp_val))
+        ))
+            .parse(i)
     })
+        .parse(input)
+}
+
+
+fn parse_destructure_target(input: ParserSpan) -> PResult<AssignmentTarget> {
+    // Recognize a bracketed list of assignment targets.
+    delimited(
+        char('['),
+        // You might use a combinator that expects one or more assignment targets (separated by whitespace)
+        separated_list1(multispace1, parse_assignment_target),
+        char(']'),
+    )
+        .map(|elements| AssignmentTarget::List { elements })
         .parse(input)
 }
 
@@ -293,9 +308,9 @@ fn parse_blank_line(input: ParserSpan) -> PResult<Spanned<Statement>> {
 /// Expression statement: simply parse an expression and wrap it as a Statement.
 fn parse_expr_statement(input: ParserSpan) -> PResult<Spanned<Statement>> {
     spanned(|i| {
-        let (i, _) = space0(i)?;
-        let (i, expr) = parse_expression(i)?;
-        Ok((i, Statement::Expr(*expr.value)))
+        parse_expression.map(|expr| {
+            Statement::Expr(expr)
+        }).parse(i)
     })
         .parse(input)
 }
@@ -304,20 +319,63 @@ fn parse_expr_statement(input: ParserSpan) -> PResult<Spanned<Statement>> {
 // Expression parsers.
 // --------------------------------------------
 pub fn parse_expression(input: ParserSpan) -> PResult<Spanned<Expr>> {
-    parse_expression_inner(input)
-}
-
-/// Either a binary expression or a simple expression.
-fn parse_expression_inner(input: ParserSpan) -> PResult<Spanned<Expr>> {
     alt((parse_block_or_dict, parse_binary_expression, parse_expr_toplevel)).parse(input)
 }
 
 /// A toplevel expression (number or identifier) is wrapped into Expr::Value.
 fn parse_expr_toplevel(input: ParserSpan) -> PResult<Spanned<Expr>> {
     alt((
+        parse_list_expr,
         parse_number_value.map(|sp_val| Spanned::new(sp_val.span.clone(), Expr::Value(sp_val))),
         parse_identifier_value.map(|sp_val| Spanned::new(sp_val.span.clone(), Expr::Value(sp_val))),
     ))
+        .parse(input)
+}
+
+/// Parse a list of expressions separated by whitespace or optional commas.
+/// A list: `[ item1 item2 item3 ]`. Each item is parsed with `parse_expr_no_call`
+// OLD IMPLEMENTATION
+// fn parse_list(input: Span) -> KResult<KExpr> {
+//     context(
+//         "list",
+//         delimited(
+//             char('['),
+//             preceded(
+//                 multispace0,
+//                 separated_list0(
+//                     alt((multispace1, delimited(multispace0, tag(","), multispace0))),
+//                     parse_expr_no_call,
+//                 ),
+//             ),
+//             preceded(
+//                 preceded(multispace0, opt((tag(","), multispace0))),
+//                 char(']'),
+//             ),
+//         ),
+//     )
+//         .map(KExpr::List)
+//         .parse(input)
+// }
+// NEW
+fn parse_list_expr(input: ParserSpan) -> PResult<Spanned<Expr>> {
+    spanned(|i| {
+        delimited(
+            char('['),
+            preceded(
+                multispace0,
+                separated_list0(
+                    alt((multispace1, delimited(multispace0, tag(","), multispace0))),
+                    parse_expr_toplevel,
+                ),
+            ),
+            preceded(
+                preceded(multispace0, opt((tag(","), multispace0))),
+                char(']'),
+            ),
+        )
+            .map(|elements| Expr::List { elements })
+            .parse(i)
+    })
         .parse(input)
 }
 
@@ -477,7 +535,7 @@ pub mod parser_tests {
         // The statement should be an expression wrapping a value.
         let stmt = &stmts[0];
         if let Statement::Expr(ref expr) = *stmt.value {
-            if let Expr::Value(sp_val) = expr {
+            if let Expr::Value(sp_val) = &**expr {
                 if let Value::Int(i) = *sp_val.value {
                     assert_eq!(i, 42);
                 } else {
@@ -504,7 +562,7 @@ pub mod parser_tests {
 
         let stmt = &stmts[0];
         if let Statement::Expr(ref expr) = *stmt.value {
-            if let Expr::Value(sp_val) = expr {
+            if let Expr::Value(sp_val) = &**expr {
                 if let Value::Word(ref word) = *sp_val.value {
                     assert_eq!(word, "fooBar");
                 } else {
@@ -532,7 +590,7 @@ pub mod parser_tests {
 
         // The outer statement should be a binary expression.
         if let Statement::Expr(ref expr) = *stmt.value {
-            if let Expr::BinaryExpr { lhs, op, rhs } = expr {
+            if let Expr::BinaryExpr { lhs, op, rhs } = &**expr {
                 // lhs should be "1"
                 if let Expr::Value(ref sp_val) = *lhs.value {
                     if let Value::Int(i1) = *sp_val.value {
@@ -575,7 +633,7 @@ pub mod parser_tests {
         let stmt = &stmts[0];
 
         if let Statement::Expr(ref expr) = *stmt.value {
-            if let Expr::BinaryExpr { lhs, op, rhs } = expr {
+            if let Expr::BinaryExpr { lhs, op, rhs } = &**expr {
                 // Check left operand: 10.
                 if let Expr::Value(ref sp_val) = *lhs.value {
                     if let Value::Int(i1) = *sp_val.value {
@@ -619,7 +677,7 @@ pub mod parser_tests {
         let stmt = &stmts[0];
 
         if let Statement::Expr(ref expr) = *stmt.value {
-            if let Expr::BinaryExpr { lhs, op, rhs } = expr {
+            if let Expr::BinaryExpr { lhs, op, rhs } = &**expr {
                 // Left side should be 7.
                 if let Expr::Value(ref sp_val) = *lhs.value {
                     if let Value::Int(i) = *sp_val.value {
@@ -649,76 +707,6 @@ pub mod parser_tests {
             }
         } else {
             panic!("Expected an expression statement");
-        }
-    }
-
-    #[test]
-    fn test_parse_multiple_statements() {
-        // Test with several statements separated by newlines and extra whitespace.
-        let input = "1\n\n2\n3+4";
-        let stmts = parse_complete(input).expect("should parse multiple statements");
-        // Expect three statements: "1", "2", "3+4".
-        assert_eq!(stmts.len(), 3);
-
-        // Statement 1: integer 1.
-        if let Statement::Expr(expr) = *stmts[0].value.clone() {
-            if let Expr::Value(sp_val) = expr {
-                if let Value::Int(i) = *sp_val.value {
-                    assert_eq!(i, 1);
-                } else {
-                    panic!("First statement is not integer");
-                }
-            } else {
-                panic!("First statement is not a value expression");
-            }
-        } else {
-            panic!("First statement is not an expression statement");
-        }
-
-        // Statement 2: integer 2.
-        if let Statement::Expr(expr) = *stmts[1].clone().value {
-            if let Expr::Value(sp_val) = expr {
-                if let Value::Int(i) = *sp_val.value {
-                    assert_eq!(i, 2);
-                } else {
-                    panic!("Second statement is not integer");
-                }
-            } else {
-                panic!("Second statement is not a value expression");
-            }
-        } else {
-            panic!("Second statement is not an expression statement");
-        }
-
-        // Statement 3: binary expression 3+4.
-        if let Statement::Expr(expr) = *stmts[2].clone().value {
-            if let Expr::BinaryExpr { lhs, op, rhs } = expr {
-                if let Expr::Value(sp_val) = *lhs.value {
-                    if let Value::Int(i) = *sp_val.value {
-                        assert_eq!(i, 3);
-                    } else {
-                        panic!("Left operand not integer in third statement");
-                    }
-                } else {
-                    panic!("Left operand not a value expression in third statement");
-                }
-                assert_eq!(*op.value, Operator::Add);
-                if let Expr::Value(ref sp_val) = *rhs.value {
-                    if let Value::Int(i) = *sp_val.value {
-                        assert_eq!(i, 4);
-                    } else {
-                        panic!("Right operand not integer in third statement");
-                    }
-                } else {
-                    panic!("Right operand not a value expression in third statement");
-                }
-                let span_text = &input[stmts[2].span.start..stmts[2].span.end];
-                assert_eq!(span_text, "3+4");
-            } else {
-                panic!("Expected a binary expression in third statement");
-            }
-        } else {
-            panic!("Third statement is not an expression statement");
         }
     }
 

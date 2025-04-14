@@ -344,7 +344,7 @@ pub enum Statement {
     Comment(String),
 
     /// Evaluates an expression without binding the result (e.g. `123` -> `123`).
-    Expr(Expr),
+    Expr(Spanned<Expr>),
 
     /// Binds the value of an expression to a target.
     Assign {

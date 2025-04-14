@@ -1,0 +1,11 @@
+==== value integer
+1234
+
+----
+(Block 1234)
+
+==== value word
+foo
+
+----
+(Block foo)
