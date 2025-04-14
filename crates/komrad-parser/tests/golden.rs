@@ -1,14 +1,14 @@
 use glob;
-use komrad_core::{parse_sexpr, CodeAtlas, ParseError, SParseError, ToSExpr};
+use komrad_core::{CodeAtlas, ParseError, SParseError, ToSExpr, parse_sexpr};
 use komrad_parser::parse_toplevel::parse_snippet_complete;
 use miette::NamedSource;
 use nom::{
-    branch::alt, bytes::complete::{tag, take_until},
+    IResult, Parser,
+    branch::alt,
+    bytes::complete::{tag, take_until},
     character::complete::{newline, not_line_ending},
     combinator::{complete, rest},
     multi::{many0, separated_list0},
-    IResult,
-    Parser,
 };
 use nom_locate::LocatedSpan;
 use owo_colors::OwoColorize;
@@ -62,14 +62,14 @@ impl TestCase {
         let mut codemaps = CodeAtlas::new();
 
         // 1) Parse the source code as KExpr
-        let toplevel = parse_snippet_complete(&mut codemaps, &self.source).map_err(TestCaseError::ParseSource)?;
+        let toplevel = parse_snippet_complete(&mut codemaps, &self.source)
+            .map_err(TestCaseError::ParseSource)?;
 
         // 2) Convert that KExpr to an SExpr
         let actual_sexpr = toplevel.to_sexpr();
 
         // 3) Parse the expected text as an SExpr
-        let expected_sexpr =
-            parse_sexpr(&self.expected).map_err(TestCaseError::ParseExpected)?;
+        let expected_sexpr = parse_sexpr(&self.expected).map_err(TestCaseError::ParseExpected)?;
 
         // 4) Compare
         if actual_sexpr == expected_sexpr {
@@ -79,7 +79,7 @@ impl TestCase {
                 format!("{:#?}", expected_sexpr),
                 format!("{:#?}", actual_sexpr),
             )
-                .into())
+            .into())
         }
     }
 }
@@ -200,7 +200,7 @@ fn parse_expected_block(input: SuiteSpan) -> SuiteResult<String> {
         complete(take_until("\n====")),
         rest, // If there's no further \"====\", parse everything to the end
     ))
-        .parse(input)?;
+    .parse(input)?;
     Ok((input, exp_span.fragment().trim().to_string()))
 }
 
@@ -239,7 +239,6 @@ fn parse_test_case(input: SuiteSpan) -> SuiteResult<TestCase> {
     };
     Ok((input, test_case))
 }
-
 
 use std::path::PathBuf;
 

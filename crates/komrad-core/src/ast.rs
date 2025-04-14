@@ -1,5 +1,5 @@
-use crate::codemap::ParserSpan;
 use crate::Channel;
+use crate::codemap::ParserSpan;
 use nom::error::{FromExternalError, ParseError as NomParseError};
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
@@ -21,7 +21,11 @@ pub struct Span {
 #[cfg(test)]
 impl Default for Span {
     fn default() -> Self {
-        Span { file_id: 0, start: 0, end: 0 }
+        Span {
+            file_id: 0,
+            start: 0,
+            end: 0,
+        }
     }
 }
 
@@ -314,9 +318,7 @@ pub enum Expr {
     },
 
     /// A list expression, each element spanned.
-    List {
-        elements: Vec<Spanned<Expr>>,
-    },
+    List { elements: Vec<Spanned<Expr>> },
 
     /// A binary operation (e.g., `lhs + rhs`).
     BinaryExpr {
@@ -446,7 +448,11 @@ impl Pattern {
     #[cfg(test)]
     pub(crate) fn new_word(word: String) -> Spanned<Pattern> {
         Spanned::new(
-            Span { file_id: 0, start: 0, end: word.len() },
+            Span {
+                file_id: 0,
+                start: 0,
+                end: word.len(),
+            },
             Pattern::VariableCapture(word),
         )
     }
@@ -454,7 +460,11 @@ impl Pattern {
     #[cfg(test)]
     pub(crate) fn new_block_capture(name: String) -> Spanned<Pattern> {
         Spanned::new(
-            Span { file_id: 0, start: 0, end: name.len() },
+            Span {
+                file_id: 0,
+                start: 0,
+                end: name.len(),
+            },
             Pattern::BlockCapture(name),
         )
     }
@@ -462,9 +472,17 @@ impl Pattern {
     #[cfg(test)]
     pub(crate) fn new_predicate_capture(pred: Predicate) -> Spanned<Pattern> {
         Spanned::new(
-            Span { file_id: 0, start: 0, end: 1 },
+            Span {
+                file_id: 0,
+                start: 0,
+                end: 1,
+            },
             Pattern::PredicateCapture(Spanned::new(
-                Span { file_id: 0, start: 0, end: 1 },
+                Span {
+                    file_id: 0,
+                    start: 0,
+                    end: 1,
+                },
                 pred,
             )),
         )
@@ -473,7 +491,11 @@ impl Pattern {
     #[cfg(test)]
     pub(crate) fn new_list(patterns: Vec<Spanned<Pattern>>) -> Spanned<Pattern> {
         Spanned::new(
-            Span { file_id: 0, start: 0, end: 1 },
+            Span {
+                file_id: 0,
+                start: 0,
+                end: 1,
+            },
             Pattern::List(patterns),
         )
     }
@@ -486,7 +508,11 @@ mod tests {
 
     #[test]
     fn test_spanned_construction() {
-        let span = Span { file_id: 1, start: 0, end: 5 };
+        let span = Span {
+            file_id: 1,
+            start: 0,
+            end: 5,
+        };
         let expr = Expr::Value(Spanned::new(span.clone(), Value::Int(10)));
         let sp_expr = Spanned::new(span.clone(), expr.clone());
         assert_eq!(sp_expr.span, span);
@@ -495,12 +521,14 @@ mod tests {
 
     #[test]
     fn test_block_is_stored() {
-        let block = Block(vec![
-            Spanned::new(
-                Span { file_id: 1, start: 0, end: 1 },
-                Statement::InvalidBlock
-            )
-        ]);
+        let block = Block(vec![Spanned::new(
+            Span {
+                file_id: 1,
+                start: 0,
+                end: 1,
+            },
+            Statement::InvalidBlock,
+        )]);
         let val = Value::Block(Arc::new(block));
         match val {
             Value::Block(b) => {
@@ -512,7 +540,11 @@ mod tests {
 
     #[test]
     fn test_pattern_capture() {
-        let span = Span { file_id: 1, start: 10, end: 12 };
+        let span = Span {
+            file_id: 1,
+            start: 10,
+            end: 12,
+        };
         let pat = Pattern::VariableCapture("x".to_string());
         let sp_pat = Spanned::new(span.clone(), pat.clone());
         assert_eq!(sp_pat.span, span);

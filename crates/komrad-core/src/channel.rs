@@ -1,6 +1,6 @@
 use crate::ast::{RuntimeError, Value};
 use std::sync::Arc;
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::{Mutex, mpsc};
 
 const CHANNEL_CAPACITY_MSG: usize = 64;
 const CHANNEL_CAPACITY_CTL: usize = 8;
@@ -110,7 +110,7 @@ impl Channel {
         };
         match self.sender_msg.send(msg).await {
             Ok(_) => Ok(()),
-            Err(_) => Err(RuntimeError::ChannelError("Channel closed".to_string()))
+            Err(_) => Err(RuntimeError::ChannelError("Channel closed".to_string())),
         }
     }
 
@@ -140,9 +140,7 @@ impl ChannelListener {
         let mut receiver = self.receiver_msg.lock().await;
         match receiver.recv().await {
             Some(msg) => Ok(msg),
-            None => {
-                Err(RuntimeError::ChannelError("Channel closed".to_string()))
-            }
+            None => Err(RuntimeError::ChannelError("Channel closed".to_string())),
         }
     }
 
@@ -151,9 +149,9 @@ impl ChannelListener {
         let mut receiver = self.receiver_ctl.lock().await;
         match receiver.recv().await {
             Some(msg) => Ok(msg),
-            None => {
-                Err(RuntimeError::ChannelError("Control channel closed".to_string()))
-            }
+            None => Err(RuntimeError::ChannelError(
+                "Control channel closed".to_string(),
+            )),
         }
     }
 }
@@ -190,7 +188,10 @@ mod tests {
             match listener.recv().await {
                 Ok(msg) => {
                     if let Some(reply_to) = msg.reply_to {
-                        reply_to.send(Value::String("Reply from channel 2!".to_string())).await.unwrap();
+                        reply_to
+                            .send(Value::String("Reply from channel 2!".to_string()))
+                            .await
+                            .unwrap();
                     }
                 }
                 Err(_) => panic!("Expected to receive the message"),
@@ -198,7 +199,9 @@ mod tests {
         });
 
         match channel1.send_and_recv(value.clone()).await {
-            Ok(response) => assert_eq!(response, Value::String("Reply from channel 2!".to_string())),
+            Ok(response) => {
+                assert_eq!(response, Value::String("Reply from channel 2!".to_string()))
+            }
             Err(_) => panic!("Expected to receive the response"),
         }
     }

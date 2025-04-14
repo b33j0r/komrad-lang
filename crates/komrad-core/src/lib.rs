@@ -2,13 +2,13 @@
 #![feature(box_patterns)]
 
 mod agent;
+mod ast;
 mod channel;
+mod codemap;
+mod destructure;
 mod env;
 mod evaluator;
-mod ast;
-mod codemap;
 mod sexpr;
-mod destructure;
 
 pub use agent::*;
 pub use ast::*;

@@ -1,6 +1,5 @@
 use crate::ast::{
-    AssignmentTarget, Block, Expr, Handler, Operator, Pattern, Predicate, Statement, Type,
-    Value,
+    AssignmentTarget, Block, Expr, Handler, Operator, Pattern, Predicate, Statement, Type, Value,
 };
 use crate::{RuntimeError, Spanned, TopLevel};
 use std::fmt::Debug;
@@ -54,7 +53,12 @@ fn colorize_token(token: &str) -> String {
         return token.bright_green().to_string();
     }
     // If first char is uppercase, color it bright_blue
-    if token.chars().next().map(|c| c.is_uppercase()).unwrap_or(false) {
+    if token
+        .chars()
+        .next()
+        .map(|c| c.is_uppercase())
+        .unwrap_or(false)
+    {
         return token.bright_blue().to_string();
     }
     // Otherwise, default color
@@ -213,10 +217,7 @@ impl ToSExpr for Expr {
     fn to_sexpr(&self) -> SExpr {
         use Expr::*;
         match self {
-            Value(v) => SExpr::List(vec![
-                SExpr::Atom("Value".to_string()),
-                v.to_sexpr(),
-            ]),
+            Value(v) => SExpr::List(vec![SExpr::Atom("Value".to_string()), v.to_sexpr()]),
             Ask { target, value } => SExpr::List(vec![
                 SExpr::Atom("Ask".to_string()),
                 target.to_sexpr(),
@@ -249,10 +250,7 @@ impl ToSExpr for Value {
         use Value::*;
         match self {
             Null => SExpr::Atom("null".to_string()),
-            Error(e) => SExpr::List(vec![
-                SExpr::Atom("Error".to_string()),
-                e.to_sexpr(),
-            ]),
+            Error(e) => SExpr::List(vec![SExpr::Atom("Error".to_string()), e.to_sexpr()]),
             Channel(c) => SExpr::List(vec![
                 SExpr::Atom("Channel".to_string()),
                 SExpr::Atom(format!("{:?}", c)),
@@ -270,10 +268,9 @@ impl ToSExpr for Value {
             Int(i) => SExpr::Atom(i.to_string()),
             Float(f) => SExpr::Atom(f.to_string()),
             Uuid(u) => SExpr::Atom(u.to_string()),
-            Block(arc_block) => SExpr::List(vec![
-                SExpr::Atom("Block".to_string()),
-                arc_block.to_sexpr(),
-            ]),
+            Block(arc_block) => {
+                SExpr::List(vec![SExpr::Atom("Block".to_string()), arc_block.to_sexpr()])
+            }
         }
     }
 }
@@ -299,19 +296,14 @@ impl ToSExpr for Statement {
         use Statement::*;
         match self {
             BlankLine => SExpr::Atom("BlankLine".to_string()),
-            Comment(s) => SExpr::List(vec![
-                SExpr::Atom("Comment".to_string()),
-                s.to_sexpr(),
-            ]),
-            Expr(e) => SExpr::List(vec![
-                SExpr::Atom("ExprStmt".to_string()),
-                e.to_sexpr(),
-            ]),
-            Assign { target, type_name, value } => {
-                let mut vec = vec![
-                    SExpr::Atom("Assign".to_string()),
-                    target.to_sexpr(),
-                ];
+            Comment(s) => SExpr::List(vec![SExpr::Atom("Comment".to_string()), s.to_sexpr()]),
+            Expr(e) => SExpr::List(vec![SExpr::Atom("ExprStmt".to_string()), e.to_sexpr()]),
+            Assign {
+                target,
+                type_name,
+                value,
+            } => {
+                let mut vec = vec![SExpr::Atom("Assign".to_string()), target.to_sexpr()];
                 vec.push(type_name.to_sexpr());
                 vec.push(value.to_sexpr());
                 SExpr::List(vec)
@@ -325,10 +317,9 @@ impl ToSExpr for Statement {
                 SExpr::Atom("Handler".to_string()),
                 handler_arc.to_sexpr(),
             ]),
-            Expand { target } => SExpr::List(vec![
-                SExpr::Atom("Expand".to_string()),
-                target.to_sexpr(),
-            ]),
+            Expand { target } => {
+                SExpr::List(vec![SExpr::Atom("Expand".to_string()), target.to_sexpr()])
+            }
             InvalidBlock => SExpr::Atom("InvalidBlock".to_string()),
         }
     }
@@ -358,10 +349,7 @@ impl ToSExpr for AssignmentTarget {
     fn to_sexpr(&self) -> SExpr {
         use AssignmentTarget::*;
         match self {
-            Variable(s) => SExpr::List(vec![
-                SExpr::Atom("Variable".to_string()),
-                s.to_sexpr(),
-            ]),
+            Variable(s) => SExpr::List(vec![SExpr::Atom("Variable".to_string()), s.to_sexpr()]),
             Slice { target, index } => SExpr::List(vec![
                 SExpr::Atom("Slice".to_string()),
                 target.to_sexpr(),
@@ -382,18 +370,14 @@ impl ToSExpr for Pattern {
     fn to_sexpr(&self) -> SExpr {
         use Pattern::*;
         match self {
-            ValueMatch(v) => SExpr::List(vec![
-                SExpr::Atom("ValueMatch".to_string()),
-                v.to_sexpr(),
-            ]),
+            ValueMatch(v) => SExpr::List(vec![SExpr::Atom("ValueMatch".to_string()), v.to_sexpr()]),
             VariableCapture(s) => SExpr::List(vec![
                 SExpr::Atom("VariableCapture".to_string()),
                 s.to_sexpr(),
             ]),
-            BlockCapture(s) => SExpr::List(vec![
-                SExpr::Atom("BlockCapture".to_string()),
-                s.to_sexpr(),
-            ]),
+            BlockCapture(s) => {
+                SExpr::List(vec![SExpr::Atom("BlockCapture".to_string()), s.to_sexpr()])
+            }
             PredicateCapture(sp_pred) => SExpr::List(vec![
                 SExpr::Atom("PredicateCapture".to_string()),
                 sp_pred.to_sexpr(),
@@ -506,7 +490,8 @@ fn parse_list(input: SParserSpan) -> SResult<SExpr> {
             SExpr::List,
         ),
         char(')'),
-    ).parse(input)
+    )
+    .parse(input)
 }
 
 /// Parse a double-quoted string. Basic escapes: \" \\ \n \r \t
@@ -529,7 +514,8 @@ fn parse_string(input: SParserSpan) -> SResult<SExpr> {
 /// Parse an atom (word) until whitespace or '(' or ')'.
 /// If the atom == "nil", return `SExpr::Nil`, else `SExpr::Atom`.
 fn parse_atom(input: SParserSpan) -> SResult<SExpr> {
-    let (input, atom_text) = take_while1(|c: char| !c.is_whitespace() && c != '(' && c != ')')(input)?;
+    let (input, atom_text) =
+        take_while1(|c: char| !c.is_whitespace() && c != '(' && c != ')')(input)?;
     let s = atom_text.fragment();
     if *s == "nil" {
         Ok((input, SExpr::Nil))

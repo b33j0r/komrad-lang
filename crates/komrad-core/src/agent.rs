@@ -22,10 +22,8 @@ pub trait MessageHandler {
 pub trait Agent: MessageHandler + AgentLifecycle {
     fn spawn(self) -> Channel;
 
-    fn spawn_with_initializer(
-        self: Box<Self>,
-        initializer_map: IndexMap<String, Value>,
-    ) -> Channel;
+    fn spawn_with_initializer(self: Box<Self>, initializer_map: IndexMap<String, Value>)
+    -> Channel;
 
     async fn run(
         &mut self,

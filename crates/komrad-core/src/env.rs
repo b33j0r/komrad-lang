@@ -1,8 +1,8 @@
+use crate::ast::{Handler, Value};
 use indexmap::IndexMap;
 use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use crate::ast::{Handler, Value};
 
 pub struct Env {
     scope_stack: VecDeque<Arc<Scope>>,
@@ -168,8 +168,8 @@ impl Default for Scope {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::HashMap;
     use crate::ast::{Block, Expr, Pattern, Spanned, Value};
+    use std::collections::HashMap;
 
     #[tokio::test]
     async fn test_env() {
@@ -209,7 +209,6 @@ mod tests {
         };
         env.push_handler(handler).await;
 
-
         // Clone a child environment
         let mut child_env = env.clone_child().await;
         // Child inherits all scope data
@@ -234,13 +233,10 @@ mod tests {
             pattern: Pattern::new_word("foo".to_string()),
             expr: Spanned::new(
                 crate::ast::Span::default(),
-                Expr::Value(Spanned::new(
-                    crate::ast::Span::default(),
-                    Value::Int(100)
-                )),
+                Expr::Value(Spanned::new(crate::ast::Span::default(), Value::Int(100))),
             ),
         })
-            .await;
+        .await;
 
         // Clone a child environment
         let mut child_env = env.clone_handler_scope().await;

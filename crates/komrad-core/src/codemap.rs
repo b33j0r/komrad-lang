@@ -6,7 +6,6 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-
 /// Attached context carried through parsing (in LocatedSpan)
 #[derive(Debug, Clone)]
 pub struct Context {
@@ -16,7 +15,6 @@ pub struct Context {
 
 /// Used by nom for span tracking
 pub type ParserSpan<'a> = LocatedSpan<&'a str, Context>;
-
 
 impl<'a> From<ParserSpan<'a>> for Span {
     fn from(span: ParserSpan) -> Self {
@@ -52,14 +50,21 @@ pub struct CodeMap {
 
 impl CodeMap {
     pub fn new(file_id: usize, source: Arc<String>, file_path: Option<PathBuf>) -> Self {
-        Self { file_id, source, file_path }
+        Self {
+            file_id,
+            source,
+            file_path,
+        }
     }
 
     pub fn parser_span(&self) -> ParserSpan {
-        LocatedSpan::new_extra(&self.source[..], Context {
-            file_id: self.file_id,
-            full_source: self.source.clone(),
-        })
+        LocatedSpan::new_extra(
+            &self.source[..],
+            Context {
+                file_id: self.file_id,
+                full_source: self.source.clone(),
+            },
+        )
     }
 
     pub fn span_range(&self, start: usize, end: usize) -> Span {

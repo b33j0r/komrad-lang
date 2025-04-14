@@ -1,23 +1,26 @@
 use ratatui::crossterm::event::{
-    self, DisableMouseCapture, EnableMouseCapture, Event as CrosstermEvent, KeyCode,
+    self,
+    DisableMouseCapture,
+    EnableMouseCapture,
+    Event as CrosstermEvent,
+    KeyCode,
     KeyEvent as TuiKeyEvent, // We'll use the re-exported TuiKeyEvent type
 };
 use ratatui::crossterm::{
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use ratatui::prelude::{Line, Text};
 use ratatui::{
+    Terminal,
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
     style::{Color, Style},
     widgets::{Block, Borders, Paragraph},
-    Terminal,
 };
 use std::{
     error::Error,
-    io,
-    thread,
+    io, thread,
     time::{Duration, Instant},
 };
 use tokio::{select, sync::mpsc, time};
@@ -86,13 +89,14 @@ impl LogFormatter for MyLogFormatter {
             log::Level::Warn => Color::LightMagenta,
             log::Level::Error => Color::LightRed,
         };
-        textwrap::wrap(evt.msg(), width).iter().map(|line| {
-            let span = ratatui::prelude::Span::styled(
-                line.to_string(),
-                Style::default().fg(color),
-            );
-            Line::from(span)
-        }).collect()
+        textwrap::wrap(evt.msg(), width)
+            .iter()
+            .map(|line| {
+                let span =
+                    ratatui::prelude::Span::styled(line.to_string(), Style::default().fg(color));
+                Line::from(span)
+            })
+            .collect()
         //
         // let span = ratatui::prelude::Span::styled(
         //     evt.msg().to_string(),
@@ -152,7 +156,9 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
 
     // Listen for Ctrl+C separately to immediately cancel the main loop
     tokio::spawn(async move {
-        tokio::signal::ctrl_c().await.expect("Failed to listen for Ctrl+C");
+        tokio::signal::ctrl_c()
+            .await
+            .expect("Failed to listen for Ctrl+C");
         shutdown_ctrlc.cancel();
     });
 
@@ -170,10 +176,7 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
                 .margin(1)
-                .constraints([
-                    Constraint::Percentage(80),
-                    Constraint::Percentage(20),
-                ])
+                .constraints([Constraint::Percentage(80), Constraint::Percentage(20)])
                 .split(f.area());
 
             let logger_widget = TuiLoggerWidget::default()
@@ -182,8 +185,7 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
                 .state(&mut logger_state);
             f.render_widget(logger_widget, chunks[0]);
 
-            input_area
-                .set_block(Block::default().borders(Borders::ALL).title("Input"));
+            input_area.set_block(Block::default().borders(Borders::ALL).title("Input"));
             f.render_widget(&input_area, chunks[1]);
         })?;
 
@@ -257,7 +259,11 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
     }
 
     disable_raw_mode()?;
-    execute!(terminal.backend_mut(), LeaveAlternateScreen, DisableMouseCapture)?;
+    execute!(
+        terminal.backend_mut(),
+        LeaveAlternateScreen,
+        DisableMouseCapture
+    )?;
     terminal.show_cursor()?;
     Ok(())
 }

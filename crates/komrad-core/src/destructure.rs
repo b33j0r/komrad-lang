@@ -65,13 +65,11 @@ impl Destructure for PatternDestructure {
             (Pattern::BlockCapture(_), _) => DestructureResult::NoMatch,
 
             // Match a predicate like _(x > 3)
-            (Pattern::PredicateCapture(pred), value) => {
-                match evaluate_predicate(&*pred, value) {
-                    Ok(true) => DestructureResult::Match(bindings),
-                    Ok(false) => DestructureResult::NoMatch,
-                    Err(e) => DestructureResult::Err(e),
-                }
-            }
+            (Pattern::PredicateCapture(pred), value) => match evaluate_predicate(&*pred, value) {
+                Ok(true) => DestructureResult::Match(bindings),
+                Ok(false) => DestructureResult::NoMatch,
+                Err(e) => DestructureResult::Err(e),
+            },
 
             // List destructuring with nested elements
             (Pattern::List(pats), Value::List(vals)) => {
@@ -102,7 +100,9 @@ fn evaluate_predicate(pred: &Predicate, input: &Value) -> Result<bool, RuntimeEr
     let val = eval_predicate_expr(pred, input)?;
     match val {
         Value::Boolean(b) => Ok(b),
-        _ => Err(RuntimeError::TypeError("Predicate did not evaluate to a boolean".to_string())),
+        _ => Err(RuntimeError::TypeError(
+            "Predicate did not evaluate to a boolean".to_string(),
+        )),
     }
 }
 
@@ -129,67 +129,71 @@ fn eval_predicate_expr(pred: &Predicate, input: &Value) -> Result<Value, Runtime
 // Returns a Value (usually a numeric result for arithmetic or a Boolean for comparisons).
 fn apply_operator(lhs: &Value, op: &Operator, rhs: &Value) -> Result<Value, RuntimeError> {
     match op {
-        Operator::Add => {
-            match (lhs, rhs) {
-                (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a + b)),
-                (Value::Int(a), Value::Float(b)) => Ok(Value::Float((*a as f64) + b)),
-                (Value::Float(a), Value::Int(b)) => Ok(Value::Float(a + (*b as f64))),
-                (Value::Float(a), Value::Float(b)) => Ok(Value::Float(a + b)),
-                _ => Err(RuntimeError::TypeError("Add operator requires numeric operands".to_string())),
-            }
-        }
-        Operator::Subtract => {
-            match (lhs, rhs) {
-                (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a - b)),
-                (Value::Int(a), Value::Float(b)) => Ok(Value::Float((*a as f64) - b)),
-                (Value::Float(a), Value::Int(b)) => Ok(Value::Float(a - (*b as f64))),
-                (Value::Float(a), Value::Float(b)) => Ok(Value::Float(a - b)),
-                _ => Err(RuntimeError::TypeError("Subtract operator requires numeric operands".to_string())),
-            }
-        }
-        Operator::Multiply => {
-            match (lhs, rhs) {
-                (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a * b)),
-                (Value::Int(a), Value::Float(b)) => Ok(Value::Float((*a as f64) * b)),
-                (Value::Float(a), Value::Int(b)) => Ok(Value::Float(a * (*b as f64))),
-                (Value::Float(a), Value::Float(b)) => Ok(Value::Float(a * b)),
-                _ => Err(RuntimeError::TypeError("Multiply operator requires numeric operands".to_string())),
-            }
-        }
+        Operator::Add => match (lhs, rhs) {
+            (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a + b)),
+            (Value::Int(a), Value::Float(b)) => Ok(Value::Float((*a as f64) + b)),
+            (Value::Float(a), Value::Int(b)) => Ok(Value::Float(a + (*b as f64))),
+            (Value::Float(a), Value::Float(b)) => Ok(Value::Float(a + b)),
+            _ => Err(RuntimeError::TypeError(
+                "Add operator requires numeric operands".to_string(),
+            )),
+        },
+        Operator::Subtract => match (lhs, rhs) {
+            (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a - b)),
+            (Value::Int(a), Value::Float(b)) => Ok(Value::Float((*a as f64) - b)),
+            (Value::Float(a), Value::Int(b)) => Ok(Value::Float(a - (*b as f64))),
+            (Value::Float(a), Value::Float(b)) => Ok(Value::Float(a - b)),
+            _ => Err(RuntimeError::TypeError(
+                "Subtract operator requires numeric operands".to_string(),
+            )),
+        },
+        Operator::Multiply => match (lhs, rhs) {
+            (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a * b)),
+            (Value::Int(a), Value::Float(b)) => Ok(Value::Float((*a as f64) * b)),
+            (Value::Float(a), Value::Int(b)) => Ok(Value::Float(a * (*b as f64))),
+            (Value::Float(a), Value::Float(b)) => Ok(Value::Float(a * b)),
+            _ => Err(RuntimeError::TypeError(
+                "Multiply operator requires numeric operands".to_string(),
+            )),
+        },
         Operator::Divide => {
             // Check for division by zero in any numeric combination.
             match (lhs, rhs) {
                 (Value::Int(_), Value::Int(0))
                 | (Value::Float(_), Value::Float(0.0))
                 | (Value::Int(_), Value::Float(0.0))
-                | (Value::Float(_), Value::Int(0)) => Err(RuntimeError::TypeError("Division by zero".to_string())),
+                | (Value::Float(_), Value::Int(0)) => {
+                    Err(RuntimeError::TypeError("Division by zero".to_string()))
+                }
                 (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a / b)),
                 (Value::Int(a), Value::Float(b)) => Ok(Value::Float((*a as f64) / b)),
                 (Value::Float(a), Value::Int(b)) => Ok(Value::Float(a / (*b as f64))),
                 (Value::Float(a), Value::Float(b)) => Ok(Value::Float(a / b)),
-                _ => Err(RuntimeError::TypeError("Divide operator requires numeric operands".to_string())),
+                _ => Err(RuntimeError::TypeError(
+                    "Divide operator requires numeric operands".to_string(),
+                )),
             }
         }
         Operator::Equal => Ok(Value::Boolean(lhs == rhs)),
         Operator::NotEqual => Ok(Value::Boolean(lhs != rhs)),
-        Operator::GreaterThan => {
-            match (lhs, rhs) {
-                (Value::Int(a), Value::Int(b)) => Ok(Value::Boolean(a > b)),
-                (Value::Int(a), Value::Float(b)) => Ok(Value::Boolean((*a as f64) > *b)),
-                (Value::Float(a), Value::Int(b)) => Ok(Value::Boolean(*a > (*b as f64))),
-                (Value::Float(a), Value::Float(b)) => Ok(Value::Boolean(a > b)),
-                _ => Err(RuntimeError::TypeError("GreaterThan operator requires numeric operands".to_string())),
-            }
-        }
-        Operator::LessThan => {
-            match (lhs, rhs) {
-                (Value::Int(a), Value::Int(b)) => Ok(Value::Boolean(a < b)),
-                (Value::Int(a), Value::Float(b)) => Ok(Value::Boolean((*a as f64) < *b)),
-                (Value::Float(a), Value::Int(b)) => Ok(Value::Boolean(*a < (*b as f64))),
-                (Value::Float(a), Value::Float(b)) => Ok(Value::Boolean(a < b)),
-                _ => Err(RuntimeError::TypeError("LessThan operator requires numeric operands".to_string())),
-            }
-        }
+        Operator::GreaterThan => match (lhs, rhs) {
+            (Value::Int(a), Value::Int(b)) => Ok(Value::Boolean(a > b)),
+            (Value::Int(a), Value::Float(b)) => Ok(Value::Boolean((*a as f64) > *b)),
+            (Value::Float(a), Value::Int(b)) => Ok(Value::Boolean(*a > (*b as f64))),
+            (Value::Float(a), Value::Float(b)) => Ok(Value::Boolean(a > b)),
+            _ => Err(RuntimeError::TypeError(
+                "GreaterThan operator requires numeric operands".to_string(),
+            )),
+        },
+        Operator::LessThan => match (lhs, rhs) {
+            (Value::Int(a), Value::Int(b)) => Ok(Value::Boolean(a < b)),
+            (Value::Int(a), Value::Float(b)) => Ok(Value::Boolean((*a as f64) < *b)),
+            (Value::Float(a), Value::Int(b)) => Ok(Value::Boolean(*a < (*b as f64))),
+            (Value::Float(a), Value::Float(b)) => Ok(Value::Boolean(a < b)),
+            _ => Err(RuntimeError::TypeError(
+                "LessThan operator requires numeric operands".to_string(),
+            )),
+        },
     }
 }
 
@@ -199,8 +203,15 @@ fn apply_operator(lhs: &Value, op: &Operator, rhs: &Value) -> Result<Value, Runt
 /// and produce an `AssignSlice` action.
 #[derive(Debug, Clone, PartialEq)]
 pub enum AssignmentAction {
-    AssignVariable { name: String, value: Value },
-    AssignSlice { container: String, indices: Vec<Value>, value: Value },
+    AssignVariable {
+        name: String,
+        value: Value,
+    },
+    AssignSlice {
+        container: String,
+        indices: Vec<Value>,
+        value: Value,
+    },
 }
 
 /// Implements destructuring logic for AssignmentTarget.
@@ -212,11 +223,17 @@ impl Destructure for AssignmentDestructure {
     type Input = Value;
     type Error = RuntimeError;
 
-    fn destructure(target: &Self::Target, input: &Self::Input) -> DestructureResult<Self::Output, Self::Error> {
+    fn destructure(
+        target: &Self::Target,
+        input: &Self::Input,
+    ) -> DestructureResult<Self::Output, Self::Error> {
         match target {
             // Simple variable assignment, e.g. a = 1
             crate::ast::AssignmentTarget::Variable(name) => {
-                DestructureResult::Match(vec![AssignmentAction::AssignVariable { name: name.clone(), value: input.clone() }])
+                DestructureResult::Match(vec![AssignmentAction::AssignVariable {
+                    name: name.clone(),
+                    value: input.clone(),
+                }])
             }
             // List destructuring, e.g. [a b c] = [1 2 3]
             crate::ast::AssignmentTarget::List { elements } => {
@@ -252,7 +269,7 @@ impl Destructure for AssignmentDestructure {
                         DestructureResult::Match(vec![AssignmentAction::AssignSlice {
                             container,
                             indices,
-                            value: input.clone()
+                            value: input.clone(),
                         }])
                     }
                     Err(e) => DestructureResult::Err(e),
@@ -264,15 +281,22 @@ impl Destructure for AssignmentDestructure {
 
 /// Recursively flattens a slice assignment target into its base variable and index expressions.
 /// For example, converting `vec[2][3]` into (`"vec"`, [expr_for_2, expr_for_3]).
-fn flatten_slice(target: &crate::ast::AssignmentTarget) -> Result<(String, Vec<Spanned<Expr>>), RuntimeError> {
+fn flatten_slice(
+    target: &crate::ast::AssignmentTarget,
+) -> Result<(String, Vec<Spanned<Expr>>), RuntimeError> {
     match target {
         crate::ast::AssignmentTarget::Variable(name) => Ok((name.clone(), Vec::new())),
-        crate::ast::AssignmentTarget::Slice { target: inner, index } => {
+        crate::ast::AssignmentTarget::Slice {
+            target: inner,
+            index,
+        } => {
             let (var, mut indices) = flatten_slice(&inner.value)?;
             indices.push(index.clone());
             Ok((var, indices))
         }
-        crate::ast::AssignmentTarget::List { .. } => Err(RuntimeError::PatternMatchError("Invalid slice assignment target".to_string())),
+        crate::ast::AssignmentTarget::List { .. } => Err(RuntimeError::PatternMatchError(
+            "Invalid slice assignment target".to_string(),
+        )),
     }
 }
 
@@ -280,13 +304,15 @@ fn flatten_slice(target: &crate::ast::AssignmentTarget) -> Result<(String, Vec<S
 /// Only literal integer or float expressions are supported.
 fn eval_index(expr: &Spanned<Expr>) -> Result<Value, RuntimeError> {
     match &*expr.value {
-        Expr::Value(inner) => {
-            match &*inner.value {
-                Value::Int(_) | Value::Float(_) => Ok(*inner.value.clone()),
-                _ => Err(RuntimeError::TypeError("Index expression must be an integer or float".to_string())),
-            }
-        }
-        _ => Err(RuntimeError::TypeError("Unsupported index expression in assignment target".to_string())),
+        Expr::Value(inner) => match &*inner.value {
+            Value::Int(_) | Value::Float(_) => Ok(*inner.value.clone()),
+            _ => Err(RuntimeError::TypeError(
+                "Index expression must be an integer or float".to_string(),
+            )),
+        },
+        _ => Err(RuntimeError::TypeError(
+            "Unsupported index expression in assignment target".to_string(),
+        )),
     }
 }
 
@@ -300,7 +326,11 @@ mod tests_assignment {
     use crate::ast::{AssignmentTarget, Expr, Span, Spanned, Value};
 
     fn dummy_span() -> Span {
-        Span { file_id: 0, start: 0, end: 0 }
+        Span {
+            file_id: 0,
+            start: 0,
+            end: 0,
+        }
     }
 
     #[test]
@@ -312,11 +342,12 @@ mod tests_assignment {
         match result {
             DestructureResult::Match(actions) => {
                 assert_eq!(actions.len(), 1);
-                assert_eq!(actions[0],
-                           AssignmentAction::AssignVariable {
-                               name: "a".to_string(),
-                               value: Value::Int(1)
-                           }
+                assert_eq!(
+                    actions[0],
+                    AssignmentAction::AssignVariable {
+                        name: "a".to_string(),
+                        value: Value::Int(1)
+                    }
                 );
             }
             _ => panic!("Expected Match for variable assignment"),
@@ -339,9 +370,18 @@ mod tests_assignment {
             DestructureResult::Match(actions) => {
                 // Expect three assignment actions.
                 assert_eq!(actions.len(), 3);
-                assert!(actions.contains(&AssignmentAction::AssignVariable { name: "a".to_string(), value: Value::Int(1) }));
-                assert!(actions.contains(&AssignmentAction::AssignVariable { name: "b".to_string(), value: Value::Int(2) }));
-                assert!(actions.contains(&AssignmentAction::AssignVariable { name: "c".to_string(), value: Value::Int(3) }));
+                assert!(actions.contains(&AssignmentAction::AssignVariable {
+                    name: "a".to_string(),
+                    value: Value::Int(1)
+                }));
+                assert!(actions.contains(&AssignmentAction::AssignVariable {
+                    name: "b".to_string(),
+                    value: Value::Int(2)
+                }));
+                assert!(actions.contains(&AssignmentAction::AssignVariable {
+                    name: "c".to_string(),
+                    value: Value::Int(3)
+                }));
             }
             _ => panic!("Expected Match for list destructuring"),
         }
@@ -352,8 +392,14 @@ mod tests_assignment {
         // Test: vec[2] = 12.0
         // Build target: Slice { target: Variable("vec"), index: literal 2 }
         let var_target = Spanned::new(dummy_span(), AssignmentTarget::Variable("vec".to_string()));
-        let index_expr = Spanned::new(dummy_span(), Expr::Value(Spanned::new(dummy_span(), Value::Int(2))));
-        let target = AssignmentTarget::Slice { target: var_target, index: index_expr };
+        let index_expr = Spanned::new(
+            dummy_span(),
+            Expr::Value(Spanned::new(dummy_span(), Value::Int(2))),
+        );
+        let target = AssignmentTarget::Slice {
+            target: var_target,
+            index: index_expr,
+        };
         let input = Value::Float(12.0);
         let result = AssignmentDestructure::destructure(&target, &input);
         match result {
@@ -395,7 +441,11 @@ mod tests_pattern_destructure {
 
     // Utility: create a dummy span.
     fn dummy_span() -> Span {
-        Span { file_id: 0, start: 0, end: 0 }
+        Span {
+            file_id: 0,
+            start: 0,
+            end: 0,
+        }
     }
 
     #[test]
@@ -453,7 +503,10 @@ mod tests_pattern_destructure {
         match result {
             DestructureResult::Match(bindings) => {
                 // No bindings are expected in a literal match.
-                assert!(bindings.is_empty(), "Expected no bindings for literal match");
+                assert!(
+                    bindings.is_empty(),
+                    "Expected no bindings for literal match"
+                );
             }
             _ => panic!("Expected Match for value literal"),
         }
@@ -514,11 +567,14 @@ mod tests_pattern_destructure {
         let spanned_var = Spanned::new(dummy_span(), Predicate::Variable("x".into()));
         let spanned_five = Spanned::new(dummy_span(), Predicate::Value(Value::Int(5)));
         let op = Spanned::new(dummy_span(), Operator::GreaterThan);
-        let pred = Spanned::new(dummy_span(), Predicate::BinaryExpr {
-            lhs: spanned_var,
-            op,
-            rhs: spanned_five,
-        });
+        let pred = Spanned::new(
+            dummy_span(),
+            Predicate::BinaryExpr {
+                lhs: spanned_var,
+                op,
+                rhs: spanned_five,
+            },
+        );
         let pattern = Pattern::PredicateCapture(pred);
 
         // With an input greater than 5, the predicate should evaluate to true.
@@ -527,7 +583,10 @@ mod tests_pattern_destructure {
         match result {
             DestructureResult::Match(bindings) => {
                 // No bindings are expected from a predicate match.
-                assert!(bindings.is_empty(), "Expected no bindings for predicate match");
+                assert!(
+                    bindings.is_empty(),
+                    "Expected no bindings for predicate match"
+                );
             }
             _ => panic!("Expected Match for predicate capture when condition is true"),
         }

@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, Data, DeriveInput, Fields, Variant};
+use syn::{Data, DeriveInput, Fields, Variant, parse_macro_input};
 
 /// The Agent derive macro
 #[proc_macro_derive(Agent)]
@@ -106,7 +106,7 @@ fn derive_for_struct(name: &syn::Ident, data: &syn::DataStruct) -> TokenStream {
                         }
                         Ok(())
                     })
-                        .ok();
+                    .ok();
                 }
             }
         }

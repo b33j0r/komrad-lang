@@ -22,7 +22,9 @@ pub type PResult<'a, T> = IResult<ParserSpan<'a>, T, ParseError>;
 // Wrap a parser returning a T into one returning Spanned<T> using
 // the consumed byte offsets.
 // --------------------------------------------
-fn spanned<'a, O, F>(mut inner: F) -> impl FnMut(ParserSpan<'a>) -> IResult<ParserSpan<'a>, Spanned<O>, ParseError>
+fn spanned<'a, O, F>(
+    mut inner: F,
+) -> impl FnMut(ParserSpan<'a>) -> IResult<ParserSpan<'a>, Spanned<O>, ParseError>
 where
     F: FnMut(ParserSpan<'a>) -> IResult<ParserSpan<'a>, O, ParseError>,
 {
@@ -117,27 +119,24 @@ fn parse_statements(input: ParserSpan) -> PResult<Vec<Spanned<Statement>>> {
     // After parsing, filter out blank lines.
     delimited(
         multispace0,
-        separated_list0(
-            many1(preceded(opt(space0), line_ending)),
-            parse_statement,
-        ),
+        separated_list0(many1(preceded(opt(space0), line_ending)), parse_statement),
         multispace0,
     )
-        .map(|stmts| {
-            stmts
-                .into_iter()
-                .filter(|s| !matches!(*s.value, Statement::BlankLine))
-                .collect()
-        })
-        .parse(input)
+    .map(|stmts| {
+        stmts
+            .into_iter()
+            .filter(|s| !matches!(*s.value, Statement::BlankLine))
+            .collect()
+    })
+    .parse(input)
 }
 
 fn parse_statement(input: ParserSpan) -> PResult<Spanned<Statement>> {
-    preceded(space0, alt((
-        parse_expr_statement,
-        parse_blank_line,
-        parse_comment_line,
-    ))).parse(input)
+    preceded(
+        space0,
+        alt((parse_expr_statement, parse_blank_line, parse_comment_line)),
+    )
+    .parse(input)
 }
 
 /// Comment line: parse a comment starting with '#' and consume all characters
@@ -151,16 +150,17 @@ fn parse_comment_line(input: ParserSpan) -> PResult<Spanned<Statement>> {
         let (i, comment_text) = not_line_ending(i)?;
         // Create the Comment statement.
         Ok((i, Statement::Comment(comment_text.fragment().to_string())))
-    }).parse(input)
+    })
+    .parse(input)
 }
-
 
 /// Blank line: simply consume the line and return a Statement::BlankLine.
 fn parse_blank_line(input: ParserSpan) -> PResult<Spanned<Statement>> {
     spanned(|i| {
         let (i, _) = line_ending(i)?;
         Ok((i, Statement::BlankLine))
-    }).parse(input)
+    })
+    .parse(input)
 }
 
 /// Expression statement: simply parse an expression and wrap it as a Statement.
@@ -169,7 +169,8 @@ fn parse_expr_statement(input: ParserSpan) -> PResult<Spanned<Statement>> {
         let (i, _) = space0(i)?;
         let (i, expr) = parse_expression(i)?;
         Ok((i, Statement::Expr(*expr.value)))
-    }).parse(input)
+    })
+    .parse(input)
 }
 
 // --------------------------------------------
@@ -187,13 +188,10 @@ fn parse_expression_inner(input: ParserSpan) -> IResult<ParserSpan, Spanned<Expr
 /// A toplevel expression (number or identifier) is wrapped into Expr::Value.
 fn parse_expr_toplevel(input: ParserSpan) -> IResult<ParserSpan, Spanned<Expr>, ParseError> {
     alt((
-        parse_number.map(|sp_val| {
-            Spanned::new(sp_val.span.clone(), Expr::Value(sp_val))
-        }),
-        parse_identifier.map(|sp_val| {
-            Spanned::new(sp_val.span.clone(), Expr::Value(sp_val))
-        }),
-    )).parse(input)
+        parse_number.map(|sp_val| Spanned::new(sp_val.span.clone(), Expr::Value(sp_val))),
+        parse_identifier.map(|sp_val| Spanned::new(sp_val.span.clone(), Expr::Value(sp_val))),
+    ))
+    .parse(input)
 }
 
 /// Minimal binary expression: `expr operator expr`.
@@ -210,7 +208,17 @@ fn parse_binary_expression(input: ParserSpan) -> IResult<ParserSpan, Spanned<Exp
         start: start.location_offset(),
         end: i.location_offset(),
     };
-    Ok((i, Spanned::new(span, Expr::BinaryExpr { lhs: left, op, rhs: right })))
+    Ok((
+        i,
+        Spanned::new(
+            span,
+            Expr::BinaryExpr {
+                lhs: left,
+                op,
+                rhs: right,
+            },
+        ),
+    ))
 }
 
 // --------------------------------------------
@@ -228,8 +236,10 @@ fn parse_binary_operator(input: ParserSpan) -> IResult<ParserSpan, Spanned<Opera
             map(parse_tag("!="), |_| Operator::NotEqual),
             map(parse_tag(">"), |_| Operator::GreaterThan),
             map(parse_tag("<"), |_| Operator::LessThan),
-        )).parse(i)
-    }).parse(input)
+        ))
+        .parse(i)
+    })
+    .parse(input)
 }
 
 // --------------------------------------------
@@ -248,7 +258,8 @@ fn parse_number(input: ParserSpan) -> IResult<ParserSpan, Spanned<Value>, ParseE
             })
         })?;
         Ok((i, Value::Int(val_i64)))
-    }).parse(input)
+    })
+    .parse(input)
 }
 
 fn parse_identifier(input: ParserSpan) -> IResult<ParserSpan, Spanned<Value>, ParseError> {
@@ -258,7 +269,8 @@ fn parse_identifier(input: ParserSpan) -> IResult<ParserSpan, Spanned<Value>, Pa
             nom::bytes::complete::take_while1(|c: char| c.is_alphanumeric() || c == '_')(i)?;
         let word = ident_span.fragment().to_string();
         Ok((i, Value::Word(word)))
-    }).parse(input)
+    })
+    .parse(input)
 }
 
 #[cfg(test)]
@@ -269,12 +281,10 @@ pub mod parser_tests {
     /// Helper: Given the source code as a &str, create a new CodeMaps and parse a file.
     fn parse_complete(source: &str) -> Result<Vec<Spanned<Statement>>, ParseError> {
         let mut codemaps = CodeAtlas::new();
-        parse_file_complete(&mut codemaps, source, None).map(
-            |top| match top {
-                TopLevel::Block(block) => block.0,
-                _ => vec![],
-            },
-        )
+        parse_file_complete(&mut codemaps, source, None).map(|top| match top {
+            TopLevel::Block(block) => block.0,
+            _ => vec![],
+        })
     }
 
     #[test]
