@@ -58,12 +58,14 @@ fn colorize_token(token: &str) -> String {
         return token.bright_blue().to_string();
     }
     // Otherwise, default color
-    token.to_string()
+    token.white().to_string()
 }
 
 impl SExpr {
     /// Produces a plain, uncolored string representation of this SExpr
     /// (suitable for logging, testing, or comparing).
+    ///
+    /// See also `to_colored_string` for a colorized version.
     pub fn to_plain_string(&self) -> String {
         match self {
             SExpr::Nil => "nil".to_string(),
@@ -86,6 +88,8 @@ impl SExpr {
     /// Produces a colorized string representation of this SExpr,
     /// using the simple `colorize_token` helper function to color
     /// parentheses, string literals, capitalized words, etc.
+    ///
+    /// See also `to_plain_string` for a plain version.
     pub fn to_colored_string(&self) -> String {
         match self {
             SExpr::Nil => colorize_token("nil"),

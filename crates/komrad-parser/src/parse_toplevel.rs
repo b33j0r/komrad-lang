@@ -1,4 +1,4 @@
-// parser.rs
+// parse_toplevel
 
 use komrad_core::{Block, CodeMaps, ParserSpan, TopLevel};
 use komrad_core::{Expr, ParseError, Statement};

@@ -1,6 +1,6 @@
 use glob;
 use komrad_core::{parse_sexpr, CodeMaps, ParseError, SParseError, ToSExpr};
-use komrad_parser::parser::parse_snippet_complete;
+use komrad_parser::parse_toplevel::parse_snippet_complete;
 use miette::NamedSource;
 use nom::{
     branch::alt, bytes::complete::{tag, take_until},

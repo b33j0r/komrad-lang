@@ -32,7 +32,7 @@ use tui_logger::{
 use tui_textarea::TextArea;
 
 use komrad_core::ToSExpr;
-use komrad_parser::parser::parse_snippet_complete;
+use komrad_parser::parse_toplevel::parse_snippet_complete;
 
 /// An enum for our internal events.
 enum Event<I> {
@@ -64,7 +64,7 @@ async fn interpret_input(input: &str) -> Result<String, Box<dyn Error>> {
     let top_level = parse_snippet_complete(&mut codemaps, input)
         .map_err(|e| format!("Parse error: {:?}", e))?;
     let sexpr = top_level.to_sexpr();
-    debug!("SEXPR: {}", sexpr.to_colored_string());
+    debug!("SEXPR: {}", sexpr.to_plain_string());
 
     // Simulate a computation delay.
     time::sleep(Duration::from_millis(0)).await;
@@ -75,24 +75,30 @@ struct MyLogFormatter;
 
 impl LogFormatter for MyLogFormatter {
     fn min_width(&self) -> u16 {
-        8
+        0
     }
 
     fn format(&self, width: usize, evt: &ExtLogRecord) -> Vec<Line> {
         let color = match evt.level {
             log::Level::Trace => Color::Gray,
-            log::Level::Debug => Color::Yellow,
-            log::Level::Info => Color::Green,
-            log::Level::Warn => Color::Magenta,
-            log::Level::Error => Color::Red,
+            log::Level::Debug => Color::LightBlue,
+            log::Level::Info => Color::LightGreen,
+            log::Level::Warn => Color::LightMagenta,
+            log::Level::Error => Color::LightRed,
         };
-        textwrap::wrap(evt.msg(), width).iter().map(|line| {
-            let span = ratatui::prelude::Span::styled(
-                line.to_string(),
-                Style::default().fg(color),
-            );
-            Line::from(span)
-        }).collect()
+        // textwrap::wrap(evt.msg(), width).iter().map(|line| {
+        //     let span = ratatui::prelude::Span::styled(
+        //         line.to_string(),
+        //         Style::default().fg(color),
+        //     );
+        //     Line::from(span)
+        // }).collect()
+
+        let span = ratatui::prelude::Span::styled(
+            evt.msg().to_string(),
+            Style::default().fg(color),
+        );
+        vec![Line::from(span)]
     }
 }
 
