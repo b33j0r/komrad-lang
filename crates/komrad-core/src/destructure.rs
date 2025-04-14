@@ -297,9 +297,7 @@ fn eval_index(expr: &Spanned<Expr>) -> Result<Value, RuntimeError> {
 #[cfg(test)]
 mod tests_assignment {
     use super::*;
-    use crate::ast::Span;
-    use crate::ast::{AssignmentTarget, Expr, Spanned, Value};
-    use crate::ast::{Span, Spanned, Value};
+    use crate::ast::{AssignmentTarget, Expr, Span, Spanned, Value};
 
     fn dummy_span() -> Span {
         Span { file_id: 0, start: 0, end: 0 }
@@ -393,6 +391,7 @@ mod tests_assignment {
 #[cfg(test)]
 mod tests_pattern_destructure {
     use super::*;
+    use crate::Span;
 
     // Utility: create a dummy span.
     fn dummy_span() -> Span {
