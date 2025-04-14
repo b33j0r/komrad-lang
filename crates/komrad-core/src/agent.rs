@@ -1,11 +1,11 @@
+use crate::ast::Value;
+use crate::channel::{Channel, ChannelListener, ControlMessage, Message};
+use crate::env::Env;
 use async_trait::async_trait;
 use indexmap::IndexMap;
 use std::sync::Arc;
 use tokio::select;
-use tracing::{error, info, trace};
-use crate::channel::{Channel, ChannelListener, ControlMessage, Message};
-use crate::env::Env;
-use crate::ast::Value;
+use tracing::{error, info};
 
 /// An object that spawns a specific type of agent
 #[async_trait]

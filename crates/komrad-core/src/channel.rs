@@ -1,6 +1,6 @@
+use crate::ast::{RuntimeError, Value};
 use std::sync::Arc;
 use tokio::sync::{mpsc, Mutex};
-use crate::ast::{RuntimeError, Value};
 
 const CHANNEL_CAPACITY_MSG: usize = 64;
 const CHANNEL_CAPACITY_CTL: usize = 8;
@@ -115,7 +115,7 @@ impl Channel {
     }
 
     pub async fn send_and_recv(&self, value: Value) -> Result<Value, RuntimeError> {
-        let (reply_channel, mut listener) = Channel::new();
+        let (reply_channel, listener) = Channel::new();
         let msg = Message {
             uuid: uuid::Uuid::now_v7(),
             value,

@@ -1,5 +1,5 @@
 use glob;
-use komrad_core::{parse_sexpr, CodeMaps, ParseError, SExpr, SParseError, SParserSpan, ToSExpr};
+use komrad_core::{parse_sexpr, CodeMaps, ParseError, SParseError, ToSExpr};
 use komrad_parser::parser::parse_snippet_complete;
 use miette::NamedSource;
 use nom::{
@@ -240,52 +240,49 @@ fn parse_test_case(input: SuiteSpan) -> SuiteResult<TestCase> {
     Ok((input, test_case))
 }
 
-#[cfg(test)]
-mod test_corpus {
-    use super::*;
-    use std::path::PathBuf;
 
-    #[test]
-    fn test_corpus() -> Result<(), Box<dyn std::error::Error>> {
-        let path = PathBuf::from("tests");
-        let parse_result = parse_test_suite(&path)?;
-        assert!(
-            parse_result.1.children.len() > 0,
-            "Should have at least one test file"
-        );
+use std::path::PathBuf;
 
-        let mut failures = Vec::new();
-        let mut todos = Vec::new();
+#[test]
+fn golden_tests() -> Result<(), Box<dyn std::error::Error>> {
+    let path = PathBuf::from("tests");
+    let parse_result = parse_test_suite(&path)?;
+    assert!(
+        parse_result.1.children.len() > 0,
+        "Should have at least one test file"
+    );
 
-        for suite in parse_result.1.children {
-            for test_case in suite.test_cases {
-                if test_case.title.contains("TODO") {
-                    println!("📝 {}", test_case.title);
-                    todos.push(test_case);
-                    continue;
-                }
-                match test_case.run() {
-                    Ok(_) => println!("✅ {}", test_case.title.green()),
-                    Err(e) => {
-                        println!("❌ {}", test_case.title.red());
-                        failures.push((test_case, e));
-                    }
+    let mut failures = Vec::new();
+    let mut todos = Vec::new();
+
+    for suite in parse_result.1.children {
+        for test_case in suite.test_cases {
+            if test_case.title.contains("TODO") {
+                println!("📝 {}", test_case.title);
+                todos.push(test_case);
+                continue;
+            }
+            match test_case.run() {
+                Ok(_) => println!("✅ {}", test_case.title.green()),
+                Err(e) => {
+                    println!("❌ {}", test_case.title.red());
+                    failures.push((test_case, e));
                 }
             }
         }
-
-        for (failure, error) in &failures {
-            println!("==== {}", failure.title.bright_cyan());
-            match error {
-                TestCaseError::ParseExpected(pe) => {
-                    println!("Expected: {}", pe.clone())
-                }
-                TestCaseError::ParseSource(ps) => println!("Source: {}", ps.clone()),
-                TestCaseError::Comparison(ce) => println!("{}", ce),
-            }
-        }
-
-        assert_eq!(failures.len(), 0, "There were test failures");
-        Ok(())
     }
+
+    for (failure, error) in &failures {
+        println!("==== {}", failure.title.bright_cyan());
+        match error {
+            TestCaseError::ParseExpected(pe) => {
+                println!("Expected: {}", pe.clone())
+            }
+            TestCaseError::ParseSource(ps) => println!("Source: {}", ps.clone()),
+            TestCaseError::Comparison(ce) => println!("{}", ce),
+        }
+    }
+
+    assert_eq!(failures.len(), 0, "There were test failures");
+    Ok(())
 }

@@ -1,10 +1,9 @@
-use std::marker::PhantomData;
-use std::ops::{Deref, DerefMut};
-use async_trait::async_trait;
-use crate::AsSpanned;
-use crate::env::Env;
 use crate::ast::{Expr, Operator, RuntimeError, Spanned, Value};
+use crate::env::Env;
+use crate::AsSpanned;
+use async_trait::async_trait;
 
+#[allow(dead_code)]
 pub struct EvaluationContext {
     env: Env,
 }
@@ -114,8 +113,8 @@ impl Evaluate for Expr {
 
 #[cfg(test)]
 mod tests {
-    use crate::ast::{Span, Spanned};
     use super::*;
+    use crate::ast::{Span, Spanned};
 
     #[tokio::test]
     async fn test_evaluate_value() {
