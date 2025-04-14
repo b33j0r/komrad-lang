@@ -441,6 +441,7 @@ pub enum Pattern {
     List(Vec<Spanned<Pattern>>),
 }
 
+#[allow(dead_code)]
 impl Pattern {
     #[cfg(test)]
     pub(crate) fn new_word(word: String) -> Spanned<Pattern> {

@@ -167,8 +167,11 @@ mod tests {
     async fn test_channel_send_recv() {
         let (channel, listener) = Channel::new();
         let value = Value::String("Hello, World!".to_string());
-        channel.send(value.clone()).await;
-        let mut listener = listener.clone();
+        match channel.send(value.clone()).await {
+            Ok(_) => assert!(true),
+            Err(_) => panic!("Expected to send the message"),
+        }
+        let listener = listener.clone();
         match listener.recv().await {
             Ok(msg) => assert_eq!(msg.value, value),
             Err(_) => panic!("Expected to receive the message"),
@@ -179,12 +182,11 @@ mod tests {
     async fn test_channel_send_and_recv() {
         // set up two pairs of channels
         let (channel1, listener1) = Channel::new();
-        let (channel2, listener2) = Channel::new();
 
         let value = Value::String("Hello from channel 1!".to_string());
 
         tokio::spawn(async move {
-            let mut listener = listener1.clone();
+            let listener = listener1.clone();
             match listener.recv().await {
                 Ok(msg) => {
                     if let Some(reply_to) = msg.reply_to {
