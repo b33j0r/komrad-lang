@@ -681,6 +681,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "komrad-interpreter"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "komrad-core",
+ "komrad-macros",
+ "komrad-parser",
+ "tokio",
+]
+
+[[package]]
 name = "komrad-lang"
 version = "0.1.0"
 dependencies = [

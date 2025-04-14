@@ -1,6 +1,6 @@
 // parse_toplevel
 
-use komrad_core::{Block, CodeMaps, ParserSpan, TopLevel};
+use komrad_core::{Block, CodeAtlas, ParserSpan, TopLevel};
 use komrad_core::{Expr, ParseError, Statement};
 use komrad_core::{Operator, Span, Spanned, Value};
 use nom::branch::alt;
@@ -60,7 +60,7 @@ fn parse_digit1(input: ParserSpan<'_>) -> IResult<ParserSpan<'_>, ParserSpan<'_>
 // The top-level file parser.
 // --------------------------------------------
 pub fn parse_file_complete(
-    codemaps: &mut CodeMaps,
+    codemaps: &mut CodeAtlas,
     source: &str,
     file_path: Option<PathBuf>,
 ) -> Result<TopLevel, ParseError> {
@@ -85,7 +85,7 @@ pub fn parse_file_complete(
 }
 
 pub fn parse_snippet_complete(
-    codemaps: &mut CodeMaps,
+    codemaps: &mut CodeAtlas,
     source: &str,
 ) -> Result<TopLevel, ParseError> {
     let initial_span = codemaps.add_file(source, None);
@@ -268,7 +268,7 @@ pub mod parser_tests {
 
     /// Helper: Given the source code as a &str, create a new CodeMaps and parse a file.
     fn parse_complete(source: &str) -> Result<Vec<Spanned<Statement>>, ParseError> {
-        let mut codemaps = CodeMaps::new();
+        let mut codemaps = CodeAtlas::new();
         parse_file_complete(&mut codemaps, source, None).map(
             |top| match top {
                 TopLevel::Block(block) => block.0,

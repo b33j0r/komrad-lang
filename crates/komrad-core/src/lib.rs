@@ -8,6 +8,7 @@ mod evaluator;
 mod ast;
 mod codemap;
 mod sexpr;
+mod destructure;
 
 pub use agent::*;
 pub use ast::*;

@@ -60,7 +60,7 @@ fn spawn_blocking_event_reader(tx: mpsc::Sender<CrosstermEvent>, shutdown: Cance
 
 /// Interpreter hook.
 async fn interpret_input(input: &str) -> Result<String, Box<dyn Error>> {
-    let mut codemaps = komrad_core::CodeMaps::new();
+    let mut codemaps = komrad_core::CodeAtlas::new();
     let top_level = parse_snippet_complete(&mut codemaps, input)
         .map_err(|e| format!("Parse error: {:?}", e))?;
     let sexpr = top_level.to_sexpr();

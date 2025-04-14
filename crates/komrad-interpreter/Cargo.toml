@@ -1,0 +1,11 @@
+[package]
+name = "komrad-interpreter"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+komrad-core = { path = "../komrad-core" }
+komrad-macros = { path = "../komrad-macros" }
+komrad-parser = { path = "../komrad-parser" }
+tokio.workspace = true
+async-trait.workspace = true

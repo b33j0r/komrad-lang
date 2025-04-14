@@ -73,12 +73,12 @@ impl CodeMap {
 
 /// Holds many CodeMaps and provides file ID allocation
 #[derive(Debug, Default)]
-pub struct CodeMaps {
+pub struct CodeAtlas {
     files: HashMap<usize, CodeMap>,
     next_file_id: usize,
 }
 
-impl CodeMaps {
+impl CodeAtlas {
     pub fn new() -> Self {
         Self {
             files: HashMap::new(),

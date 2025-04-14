@@ -1,5 +1,5 @@
 use glob;
-use komrad_core::{parse_sexpr, CodeMaps, ParseError, SParseError, ToSExpr};
+use komrad_core::{parse_sexpr, CodeAtlas, ParseError, SParseError, ToSExpr};
 use komrad_parser::parse_toplevel::parse_snippet_complete;
 use miette::NamedSource;
 use nom::{
@@ -59,7 +59,7 @@ pub enum TestCaseError {
 
 impl TestCase {
     pub(crate) fn run(&self) -> Result<(), TestCaseError> {
-        let mut codemaps = CodeMaps::new();
+        let mut codemaps = CodeAtlas::new();
 
         // 1) Parse the source code as KExpr
         let toplevel = parse_snippet_complete(&mut codemaps, &self.source).map_err(TestCaseError::ParseSource)?;
