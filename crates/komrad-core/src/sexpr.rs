@@ -18,7 +18,7 @@ impl Debug for SExpr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // For the Debug output, we'll show the colorized version.
         // You could choose the plain version instead if you prefer.
-        write!(f, "{}", self.to_colored_string())
+        write!(f, "{}", self.to_plain_string())
     }
 }
 
