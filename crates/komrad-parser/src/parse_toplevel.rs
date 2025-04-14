@@ -5,12 +5,13 @@ use komrad_core::{Expr, ParseError, Statement};
 use komrad_core::{Operator, Span, Spanned, Value};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
-use nom::character::complete::{alpha1, line_ending, multispace0, not_line_ending, space0};
+use nom::character::complete::{alpha1, char, line_ending, multispace0, not_line_ending, space0};
 use nom::combinator::{map, opt};
 use nom::multi::{many0, many1, separated_list0, separated_list1};
 use nom::sequence::{delimited, pair, preceded};
 use nom::{Err as NomErr, IResult, Parser};
 use std::path::PathBuf;
+use std::sync::Arc;
 
 // --------------------------------------------
 // PResult type alias.
@@ -308,7 +309,7 @@ pub fn parse_expression(input: ParserSpan) -> PResult<Spanned<Expr>> {
 
 /// Either a binary expression or a simple expression.
 fn parse_expression_inner(input: ParserSpan) -> PResult<Spanned<Expr>> {
-    alt((parse_binary_expression, parse_expr_toplevel)).parse(input)
+    alt((parse_block_or_dict, parse_binary_expression, parse_expr_toplevel)).parse(input)
 }
 
 /// A toplevel expression (number or identifier) is wrapped into Expr::Value.
@@ -345,6 +346,39 @@ fn parse_binary_expression(input: ParserSpan) -> PResult<Spanned<Expr>> {
             },
         ),
     ))
+}
+
+// --------------------------------------------
+// Block or dictionary expression: parse a block of statements or a dictionary.
+
+/// Distinguish a `{ block }` vs. `{ dict }` by checking for colon usage, etc.
+fn parse_block_or_dict(input: ParserSpan) -> PResult<Spanned<Expr>> {
+    parse_block.parse(input)
+}
+
+/// A `{ ... }` block is a list of statements in braces.
+fn parse_block(input: ParserSpan) -> PResult<Spanned<Expr>> {
+    spanned(
+        |i| {
+            parse_block_value
+                .map(|block| {
+                    Expr::Value(block)
+                }).parse(i)
+        }
+    ).parse(input)
+}
+
+fn parse_block_value(input: ParserSpan) -> PResult<Spanned<Value>> {
+    spanned(|i| {
+        delimited(
+            char('{'),
+            delimited(multispace0, parse_statements, multispace0),
+            char('}'),
+        )
+            .map(|block| Value::Block(Arc::new(Block(block))))
+            .parse(i)
+    })
+        .parse(input)
 }
 
 // --------------------------------------------

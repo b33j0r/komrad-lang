@@ -1,0 +1,14 @@
+==== block in assignment
+X = {
+	a = 123
+	b foo bar
+}
+----
+(Block
+	(Assign (Variable "X") (Value
+		(Block
+			(Assign (Variable "a") (Value 123))
+			(Tell (Value b) (List (Value foo) (Value bar)))
+		)
+	))
+)

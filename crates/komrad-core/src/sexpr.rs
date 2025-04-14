@@ -269,7 +269,7 @@ impl ToSExpr for Value {
             Float(f) => SExpr::Atom(f.to_string()),
             Uuid(u) => SExpr::Atom(u.to_string()),
             Block(arc_block) => {
-                SExpr::List(vec![SExpr::Atom("Block".to_string()), arc_block.to_sexpr()])
+                arc_block.to_sexpr()
             }
         }
     }
