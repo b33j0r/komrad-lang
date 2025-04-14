@@ -241,7 +241,9 @@ dependencies = [
  "miette",
  "nom",
  "nom_locate",
+ "owo-colors",
  "tempfile",
+ "thiserror 2.0.12",
  "tracing",
  "tracing-subscriber",
 ]

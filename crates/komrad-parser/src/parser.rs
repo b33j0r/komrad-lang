@@ -1,6 +1,6 @@
 // parser.rs
 
-use komrad_core::{CodeMaps, ParserSpan};
+use komrad_core::{Block, CodeMaps, ParserSpan, TopLevel};
 use komrad_core::{Expr, ParseError, Statement};
 use komrad_core::{Operator, Span, Spanned, Value};
 use nom::branch::alt;
@@ -63,7 +63,7 @@ pub fn parse_file_complete(
     codemaps: &mut CodeMaps,
     source: &str,
     file_path: Option<PathBuf>,
-) -> Result<Vec<Spanned<Statement>>, ParseError> {
+) -> Result<TopLevel, ParseError> {
     let initial_span = codemaps.add_file(source, file_path);
     match parse_statements(initial_span.clone()) {
         Ok((remaining, statements)) => {
@@ -73,7 +73,31 @@ pub fn parse_file_complete(
                     span: Span::from(remaining),
                 })
             } else {
-                Ok(statements)
+                Ok(TopLevel::Block(Block(statements)))
+            }
+        }
+        Err(NomErr::Error(e)) | Err(NomErr::Failure(e)) => Err(e),
+        Err(NomErr::Incomplete(_needed)) => Err(ParseError::Incomplete {
+            remaining: source.to_string(),
+            span: Span::from(initial_span),
+        }),
+    }
+}
+
+pub fn parse_snippet_complete(
+    codemaps: &mut CodeMaps,
+    source: &str,
+) -> Result<TopLevel, ParseError> {
+    let initial_span = codemaps.add_file(source, None);
+    match parse_statements(initial_span.clone()) {
+        Ok((remaining, statements)) => {
+            if !remaining.fragment().is_empty() {
+                Err(ParseError::Incomplete {
+                    remaining: remaining.fragment().to_string(),
+                    span: Span::from(remaining),
+                })
+            } else {
+                Ok(TopLevel::Block(Block(statements)))
             }
         }
         Err(NomErr::Error(e)) | Err(NomErr::Failure(e)) => Err(e),
@@ -122,6 +146,7 @@ fn parse_comment_line(input: ParserSpan) -> PResult<Spanned<Statement>> {
     spanned(|i| {
         // Expect the comment marker immediately.
         let (i, _) = tag("#")(i)?;
+        let (i, _) = space0(i)?;
         // Consume all characters until a newline, without consuming the newline itself.
         let (i, comment_text) = not_line_ending(i)?;
         // Create the Comment statement.

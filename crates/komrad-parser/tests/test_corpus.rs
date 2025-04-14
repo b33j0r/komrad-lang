@@ -1,14 +1,14 @@
 use glob;
-use komrad_core::{SExpr, ToSExpr};
-use komrad_parser::{MietteParseError, parse_kexpr_complete, parse_sexpr_complete};
+use komrad_core::{parse_sexpr, CodeMaps, ParseError, SExpr, SParseError, SParserSpan, ToSExpr};
+use komrad_parser::parser::parse_snippet_complete;
 use miette::NamedSource;
 use nom::{
-    IResult, Parser,
-    branch::alt,
-    bytes::complete::{tag, take_until},
+    branch::alt, bytes::complete::{tag, take_until},
     character::complete::{newline, not_line_ending},
     combinator::{complete, rest},
     multi::{many0, separated_list0},
+    IResult,
+    Parser,
 };
 use nom_locate::LocatedSpan;
 use owo_colors::OwoColorize;
@@ -48,10 +48,10 @@ impl std::fmt::Display for ExpectedDidNotMatchError {
 #[derive(Debug, Clone, Error)]
 pub enum TestCaseError {
     #[error("{0:?}")]
-    ParseExpected(MietteParseError),
+    ParseExpected(SParseError),
 
     #[error("{0:?}")]
-    ParseSource(MietteParseError),
+    ParseSource(ParseError),
 
     #[error("{0:?}")]
     Comparison(#[from] ExpectedDidNotMatchError),
@@ -59,15 +59,17 @@ pub enum TestCaseError {
 
 impl TestCase {
     pub(crate) fn run(&self) -> Result<(), TestCaseError> {
+        let mut codemaps = CodeMaps::new();
+
         // 1) Parse the source code as KExpr
-        let kexpr = parse_kexpr_complete(&self.source, None).map_err(TestCaseError::ParseSource)?;
+        let toplevel = parse_snippet_complete(&mut codemaps, &self.source).map_err(TestCaseError::ParseSource)?;
 
         // 2) Convert that KExpr to an SExpr
-        let actual_sexpr: SExpr = kexpr.to_sexpr();
+        let actual_sexpr = toplevel.to_sexpr();
 
         // 3) Parse the expected text as an SExpr
         let expected_sexpr =
-            parse_sexpr_complete(&self.expected, None).map_err(TestCaseError::ParseExpected)?;
+            parse_sexpr(&self.expected).map_err(TestCaseError::ParseExpected)?;
 
         // 4) Compare
         if actual_sexpr == expected_sexpr {
@@ -77,7 +79,7 @@ impl TestCase {
                 format!("{:#?}", expected_sexpr),
                 format!("{:#?}", actual_sexpr),
             )
-            .into())
+                .into())
         }
     }
 }
@@ -198,7 +200,7 @@ fn parse_expected_block(input: SuiteSpan) -> SuiteResult<String> {
         complete(take_until("\n====")),
         rest, // If there's no further \"====\", parse everything to the end
     ))
-    .parse(input)?;
+        .parse(input)?;
     Ok((input, exp_span.fragment().trim().to_string()))
 }
 
@@ -241,7 +243,6 @@ fn parse_test_case(input: SuiteSpan) -> SuiteResult<TestCase> {
 #[cfg(test)]
 mod test_corpus {
     use super::*;
-    use miette::Report;
     use std::path::PathBuf;
 
     #[test]
@@ -277,9 +278,9 @@ mod test_corpus {
             println!("==== {}", failure.title.bright_cyan());
             match error {
                 TestCaseError::ParseExpected(pe) => {
-                    println!("Expected: {}", Report::new(pe.clone()))
+                    println!("Expected: {}", pe.clone())
                 }
-                TestCaseError::ParseSource(ps) => println!("Source: {}", Report::new(ps.clone())),
+                TestCaseError::ParseSource(ps) => println!("Source: {}", ps.clone()),
                 TestCaseError::Comparison(ce) => println!("{}", ce),
             }
         }
