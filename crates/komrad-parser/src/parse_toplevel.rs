@@ -3,9 +3,10 @@
 use crate::parse_strings::parse_string_value;
 use crate::result::PResult;
 use crate::spanned;
+use komrad_core::ParseError;
 use komrad_core::Value;
 use komrad_core::{AssignmentTarget, Block, CodeAtlas, ParserSpan, TopLevel};
-use komrad_core::{Expr, ParseError, Statement};
+use komrad_core::{Expr, Statement};
 use komrad_core::{Operator, Span, Spanned};
 use nom::branch::alt;
 use nom::bytes::complete::tag;

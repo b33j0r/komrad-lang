@@ -1,4 +1,5 @@
-use komrad_core::{ParseError, ParserSpan};
+use komrad_core::ParseError;
+use komrad_core::ParserSpan;
 use nom::IResult;
 
 // --------------------------------------------

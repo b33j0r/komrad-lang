@@ -1,4 +1,5 @@
-use komrad_core::{CodeAtlas, Env, Evaluate, EvaluationContext, RuntimeError, Spanned, Statement, TopLevel, Value};
+use komrad_core::RuntimeError;
+use komrad_core::{CodeAtlas, Env, Evaluate, EvaluationContext, Spanned, Statement, TopLevel, Value};
 use std::collections::HashMap;
 
 pub type InterpreterResult<T> = Result<T, RuntimeError>;

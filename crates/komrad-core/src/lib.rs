@@ -10,12 +10,14 @@ mod env;
 mod evaluator;
 mod sexpr;
 mod value;
+mod error;
 
 pub use agent::*;
 pub use ast::*;
 pub use channel::*;
 pub use codemap::*;
 pub use env::*;
+pub use error::*;
 pub use evaluator::*;
 pub use sexpr::*;
 pub use value::*;

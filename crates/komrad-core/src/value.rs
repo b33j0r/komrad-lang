@@ -1,4 +1,5 @@
-use crate::{Block, Channel, RuntimeError, Spanned};
+use crate::error::RuntimeError;
+use crate::{Block, Channel, Spanned};
 use indexmap::IndexMap;
 use std::sync::Arc;
 

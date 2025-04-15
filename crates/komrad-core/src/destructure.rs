@@ -1,6 +1,7 @@
 use crate::ast::Pattern;
+use crate::error::RuntimeError;
 use crate::value::Value;
-use crate::{Expr, Operator, Predicate, RuntimeError, Spanned};
+use crate::{Expr, Operator, Predicate, Spanned};
 use std::collections::HashMap;
 
 /// Match result type for destructuring:

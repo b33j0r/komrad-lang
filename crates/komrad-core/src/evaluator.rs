@@ -1,4 +1,4 @@
-use crate::ast::{AssignmentTarget, Expr, Operator, RuntimeError, Spanned, Statement};
+use crate::ast::{AssignmentTarget, Expr, Operator, Spanned, Statement};
 use crate::env::Env;
 use crate::AsSpanned;
 use async_trait::async_trait;
@@ -8,6 +8,7 @@ use std::pin::Pin;
 
 // Reuse the destructuring module for assignments.
 use crate::destructure::{AssignmentAction, AssignmentDestructure, Destructure, DestructureResult};
+use crate::error::RuntimeError;
 use crate::value::Value;
 
 #[allow(dead_code)]

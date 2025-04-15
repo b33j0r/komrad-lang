@@ -1,14 +1,14 @@
 use glob;
-use komrad_core::{CodeAtlas, ParseError, SParseError, ToSExpr, parse_sexpr};
+use komrad_core::{parse_sexpr, CodeAtlas, SParseError, ToSExpr};
 use komrad_parser::parse_toplevel::parse_snippet_complete;
 use miette::NamedSource;
 use nom::{
-    IResult, Parser,
-    branch::alt,
-    bytes::complete::{tag, take_until},
+    branch::alt, bytes::complete::{tag, take_until},
     character::complete::{newline, not_line_ending},
     combinator::{complete, rest},
     multi::{many0, separated_list0},
+    IResult,
+    Parser,
 };
 use nom_locate::LocatedSpan;
 use owo_colors::OwoColorize;
@@ -79,7 +79,7 @@ impl TestCase {
                 format!("{:#?}", expected_sexpr),
                 format!("{:#?}", actual_sexpr),
             )
-            .into())
+                .into())
         }
     }
 }
@@ -200,7 +200,7 @@ fn parse_expected_block(input: SuiteSpan) -> SuiteResult<String> {
         complete(take_until("\n====")),
         rest, // If there's no further \"====\", parse everything to the end
     ))
-    .parse(input)?;
+        .parse(input)?;
     Ok((input, exp_span.fragment().trim().to_string()))
 }
 
@@ -240,6 +240,7 @@ fn parse_test_case(input: SuiteSpan) -> SuiteResult<TestCase> {
     Ok((input, test_case))
 }
 
+use komrad_core::error::ParseError;
 use std::path::PathBuf;
 
 #[test]

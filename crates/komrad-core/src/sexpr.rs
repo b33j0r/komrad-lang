@@ -1,7 +1,7 @@
 use crate::ast::{
     AssignmentTarget, Block, Expr, Handler, Operator, Pattern, Predicate, Statement,
 };
-use crate::{RuntimeError, Spanned, TopLevel};
+use crate::{Spanned, TopLevel};
 use std::fmt::Debug;
 use std::sync::Arc;
 
@@ -457,6 +457,7 @@ impl ToSExpr for Vec<Spanned<Statement>> {
 // SExpr Parser Logic (unchanged, except we store raw strings in SExpr::Atom).
 // ----------------------------------------------------------------------------
 
+use crate::error::RuntimeError;
 use crate::value::{Type, Value};
 use nom::branch::alt;
 use nom::bytes::complete::{escaped_transform, is_not, take_while1};

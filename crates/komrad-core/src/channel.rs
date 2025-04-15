@@ -1,4 +1,4 @@
-use crate::ast::RuntimeError;
+use crate::error::RuntimeError;
 use crate::value::Value;
 use std::sync::Arc;
 use tokio::sync::{mpsc, Mutex};
