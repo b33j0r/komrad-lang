@@ -2,7 +2,7 @@ use crate::fs_agent::FsAgent;
 use crate::io_agent::IoAgent;
 use crate::spawn_agent::SpawnAgent;
 use komrad_core::{Agent, AgentFactory, RuntimeError};
-use komrad_core::{CodeAtlas, Env, Evaluate, EvaluationContext, Spanned, Statement, TopLevel, Value};
+use komrad_core::{CodeAtlas, Env, Evaluate, Spanned, Statement, TopLevel, Value};
 use komrad_parser::parse_toplevel::parse_file_complete;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -24,7 +24,7 @@ pub enum InterpreterError {
 
 pub struct Interpreter {
     codemaps: CodeAtlas,
-    evaluation_context: EvaluationContext,
+    env: Env,
 }
 
 impl Interpreter {
@@ -50,7 +50,7 @@ impl Interpreter {
         env.set("spawn", Value::Channel(spawn_agent_channel)).await;
 
         Self {
-            evaluation_context: EvaluationContext { env },
+            env,
             codemaps: CodeAtlas::new(),
         }
     }
@@ -59,7 +59,7 @@ impl Interpreter {
         &mut self,
         statement: Spanned<Statement>,
     ) -> InterpreterResult<Value> {
-        let result = statement.evaluate(&mut self.evaluation_context).await;
+        let result = statement.evaluate(&mut self.env).await;
         Ok(result)
     }
 

@@ -4,25 +4,12 @@ use crate::destructure::{AssignmentAction, AssignmentDestructure, Destructure, D
 use crate::env::Env;
 use crate::error::RuntimeError;
 use crate::value::Value;
-use crate::AsSpanned;
+use crate::{AsSpanned, ToSExpr};
 use async_trait::async_trait;
 use indexmap::IndexMap;
 use std::future::Future;
 use std::pin::Pin;
-use tracing::error;
-
-#[allow(dead_code)]
-pub struct EvaluationContext {
-    pub env: Env,
-}
-
-impl Default for EvaluationContext {
-    fn default() -> Self {
-        EvaluationContext {
-            env: Env::default(),
-        }
-    }
-}
+use tracing::{debug, error};
 
 /// A trait specifying how to evaluate an AST node into a `Value`.
 #[async_trait]
@@ -31,7 +18,7 @@ pub trait Evaluate {
     type Output = Value;
 
     /// Evaluates the given AST node into a `Value`.
-    async fn evaluate(&self, context: &mut EvaluationContext) -> Value;
+    async fn evaluate(&self, env: &mut Env) -> Value;
 }
 
 #[async_trait]
@@ -39,13 +26,13 @@ impl Evaluate for Spanned<Expr> {
     type Input = Self;
     type Output = Value;
 
-    async fn evaluate(&self, context: &mut EvaluationContext) -> Value {
+    async fn evaluate(&self, env: &mut Env) -> Value {
         match self.value.as_ref() {
             // 1) Literal/variable expression.
             Expr::Value(sp_val) => {
                 match sp_val.value.as_ref() {
                     // If it's a variable ("Word"), look it up.
-                    Value::Word(name) => match context.env.get(name).await {
+                    Value::Word(name) => match env.get(name).await {
                         Some(v) => v,
                         None => Value::Error(
                             RuntimeError::ArgumentError(format!("Undefined variable: {}", name))
@@ -60,7 +47,7 @@ impl Evaluate for Spanned<Expr> {
             Expr::List { elements } => {
                 let mut evaluated = Vec::with_capacity(elements.len());
                 for elem in elements {
-                    evaluated.push(elem.evaluate(context).await);
+                    evaluated.push(elem.evaluate(env).await);
                 }
                 Value::List(evaluated)
             }
@@ -68,14 +55,14 @@ impl Evaluate for Spanned<Expr> {
             Expr::Dict { index_map } => {
                 let mut evaluated = IndexMap::new();
                 for (key, val_expr) in index_map {
-                    evaluated.insert(key.clone(), val_expr.evaluate(context).await);
+                    evaluated.insert(key.clone(), val_expr.evaluate(env).await);
                 }
                 Value::Dict(evaluated)
             }
             // 4) Binary expression.
             Expr::BinaryExpr { lhs, op, rhs } => {
-                let left = lhs.evaluate(context).await;
-                let right = rhs.evaluate(context).await;
+                let left = lhs.evaluate(env).await;
+                let right = rhs.evaluate(env).await;
                 match op.value.as_ref() {
                     Operator::Add => match (left, right) {
                         (Value::Int(a), Value::Int(b)) => Value::Int(a + b),
@@ -119,8 +106,8 @@ impl Evaluate for Spanned<Expr> {
             }
             // 5) Ask expression – send_and_recv.
             Expr::Ask { target, value } => {
-                let targ = target.evaluate(context).await;
-                let val = value.evaluate(context).await;
+                let targ = target.evaluate(env).await;
+                let val = value.evaluate(env).await;
                 match targ {
                     Value::Channel(ch) => match ch.send_and_recv(val).await {
                         Ok(reply) => reply,
@@ -134,8 +121,8 @@ impl Evaluate for Spanned<Expr> {
             }
             // 6) Slice expression – index into a list.
             Expr::SliceExpr { target, index } => {
-                let container = target.evaluate(context).await;
-                let idx = index.evaluate(context).await;
+                let container = target.evaluate(env).await;
+                let idx = index.evaluate(env).await;
                 match (container, idx) {
                     (Value::List(vs), Value::Int(i)) => {
                         if i >= 0 && (i as usize) < vs.len() {
@@ -155,12 +142,12 @@ impl Evaluate for Spanned<Expr> {
             }
             // 7) Expander expression – expand a block or list into scope
             Expr::Expander { target } => {
-                let targ = target.evaluate(context).await;
+                let targ = target.evaluate(env).await;
                 match targ {
                     Value::Block(b) => {
                         let mut result = Value::Null;
                         for stmt in &b.0 {
-                            result = stmt.evaluate(context).await;
+                            result = stmt.evaluate(env).await;
                         }
                         result
                     }
@@ -179,26 +166,26 @@ impl Evaluate for Spanned<Statement> {
     type Input = Self;
     type Output = Value;
 
-    async fn evaluate(&self, context: &mut EvaluationContext) -> Value {
+    async fn evaluate(&self, env: &mut Env) -> Value {
         match self.value.as_ref() {
             Statement::BlankLine => Value::Null,
             Statement::Comment(_) => Value::Null,
-            Statement::Expr(expr) => expr.evaluate(context).await,
+            Statement::Expr(expr) => expr.evaluate(env).await,
             Statement::InvalidBlock => Value::Error(
                 RuntimeError::ArgumentError("Invalid block".to_string())
                     .as_spanned(self.span.clone()),
             ),
             Statement::Handler(handler) => {
-                context.env.push_handler(handler.clone()).await;
-                error!("Handler pushed: {:?}", handler);
+                env.push_handler(handler.clone()).await;
+                debug!("Handler pushed: {:?}", handler.to_sexpr());
                 Value::Null
             }
             // For assignment, we now call our shared destructuring function.
             Statement::Assign { target, value } => {
-                let evaluated_val = value.evaluate(context).await;
+                let evaluated_val = value.evaluate(env).await;
                 match AssignmentDestructure::destructure(&target.value, &evaluated_val) {
                     DestructureResult::Match(actions) => {
-                        apply_assignment_actions(actions, target.span.clone(), context).await
+                        apply_assignment_actions(actions, target.span.clone(), env).await
                     }
                     DestructureResult::NoMatch => Value::Error(
                         RuntimeError::ArgumentError("Assignment pattern mismatch".into())
@@ -208,8 +195,8 @@ impl Evaluate for Spanned<Statement> {
                 }
             }
             Statement::Tell { target, value } => {
-                let targ = target.evaluate(context).await;
-                let val = value.evaluate(context).await;
+                let targ = target.evaluate(env).await;
+                let val = value.evaluate(env).await;
                 match targ {
                     Value::Channel(ch) => match ch.send(val).await {
                         Ok(_) => Value::Null,
@@ -222,12 +209,12 @@ impl Evaluate for Spanned<Statement> {
                 }
             }
             Statement::Expand { target } => {
-                let targ = target.evaluate(context).await;
+                let targ = target.evaluate(env).await;
                 match targ {
                     Value::Block(b) => {
                         let mut result = Value::Null;
                         for stmt in &b.0 {
-                            result = stmt.evaluate(context).await;
+                            result = stmt.evaluate(env).await;
                         }
                         result
                     }
@@ -247,12 +234,12 @@ impl Evaluate for Spanned<Statement> {
 async fn apply_assignment_actions(
     actions: Vec<AssignmentAction>,
     target_span: crate::ast::Span,
-    context: &mut EvaluationContext,
+    env: &mut Env,
 ) -> Value {
     for action in actions {
         match action {
             AssignmentAction::AssignVariable { name, value } => {
-                context.env.set(&name, value).await;
+                env.set(&name, value).await;
             }
             AssignmentAction::AssignSlice {
                 container,
@@ -260,7 +247,7 @@ async fn apply_assignment_actions(
                 value,
             } => {
                 // Get the container from the environment.
-                if let Some(current) = context.env.get(&container).await {
+                if let Some(current) = env.get(&container).await {
                     match current {
                         Value::List(mut vs) => {
                             if indices.len() != 1 {
@@ -281,7 +268,7 @@ async fn apply_assignment_actions(
                                     );
                                 }
                                 vs[i as usize] = value;
-                                context.env.set(&container, Value::List(vs)).await;
+                                env.set(&container, Value::List(vs)).await;
                             } else {
                                 return Value::Error(
                                     RuntimeError::ArgumentError("Index must be an integer".into())
@@ -316,17 +303,17 @@ async fn apply_assignment_actions(
 // ----------------------------------------------------------------
 fn get_target_value<'a>(
     target: &'a Spanned<AssignmentTarget>,
-    context: &'a mut EvaluationContext,
+    env: &'a mut Env,
 ) -> Pin<Box<dyn Future<Output=Value> + Send + 'a>> {
     Box::pin(async move {
         match target.value.as_ref() {
-            AssignmentTarget::Variable(name) => context.env.get(name).await.unwrap_or(Value::Null),
+            AssignmentTarget::Variable(name) => env.get(name).await.unwrap_or(Value::Null),
             AssignmentTarget::Slice {
                 target: slice_target,
                 index,
             } => {
-                let container_val = get_target_value(slice_target, context).await;
-                let idx_val = index.evaluate(context).await;
+                let container_val = get_target_value(slice_target, env).await;
+                let idx_val = index.evaluate(env).await;
                 match (container_val, idx_val) {
                     (Value::List(vs), Value::Int(i)) => {
                         if i >= 0 && (i as usize) < vs.len() {
@@ -346,25 +333,25 @@ fn get_target_value<'a>(
 fn set_target_value<'a>(
     target: &'a Spanned<AssignmentTarget>,
     new_val: Value,
-    context: &'a mut EvaluationContext,
+    env: &'a mut Env,
 ) -> Pin<Box<dyn Future<Output=Value> + Send + 'a>> {
     Box::pin(async move {
         match target.value.as_ref() {
             AssignmentTarget::Variable(name) => {
-                context.env.set(name, new_val.clone()).await;
+                env.set(name, new_val.clone()).await;
                 new_val
             }
             AssignmentTarget::Slice {
                 target: slice_target,
                 index,
             } => {
-                let mut container_val = get_target_value(slice_target, context).await;
-                let idx_val = index.evaluate(context).await;
+                let mut container_val = get_target_value(slice_target, env).await;
+                let idx_val = index.evaluate(env).await;
                 match (container_val, idx_val) {
                     (Value::List(mut vs), Value::Int(i)) if i >= 0 && (i as usize) < vs.len() => {
                         vs[i as usize] = new_val.clone();
                         let updated = Value::List(vs);
-                        set_target_value(slice_target, updated, context).await
+                        set_target_value(slice_target, updated, env).await
                     }
                     _ => Value::Null,
                 }
@@ -385,7 +372,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_evaluate_value() {
-        let mut context = EvaluationContext::default();
+        let mut env = Env::default();
         let expr = Spanned::new(
             Span {
                 file_id: 1,
@@ -401,7 +388,7 @@ mod tests {
                 AstValue::Int(10),
             )),
         );
-        let result = expr.evaluate(&mut context).await;
+        let result = expr.evaluate(&mut env).await;
         match result {
             Value::Int(n) => assert_eq!(n, 10),
             _ => panic!("Expected Value::Int(10)"),
@@ -410,7 +397,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_evaluate_list() {
-        let mut context = EvaluationContext::default();
+        let mut env = Env::default();
         let expr = Spanned::new(
             Span {
                 file_id: 1,
@@ -452,7 +439,7 @@ mod tests {
                 ],
             },
         );
-        let result = expr.evaluate(&mut context).await;
+        let result = expr.evaluate(&mut env).await;
         match result {
             Value::List(vs) => {
                 assert_eq!(vs.len(), 2);
@@ -465,7 +452,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_evaluate_binary_add() {
-        let mut context = EvaluationContext::default();
+        let mut env = Env::default();
         let expr = Spanned::new(
             Span {
                 file_id: 1,
@@ -513,7 +500,7 @@ mod tests {
                 ),
             },
         );
-        let result = expr.evaluate(&mut context).await;
+        let result = expr.evaluate(&mut env).await;
         match result {
             Value::Int(n) => assert_eq!(n, 5),
             _ => panic!("Expected Value::Int(5)"),
@@ -522,7 +509,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_evaluate_binary_divide_by_zero() {
-        let mut context = EvaluationContext::default();
+        let mut context = Env::default();
         let expr = Spanned::new(
             Span {
                 file_id: 1,
@@ -584,7 +571,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_evaluate_slice_expr() {
-        let mut context = EvaluationContext::default();
+        let mut env = Env::default();
         let expr = Spanned::new(
             Span {
                 file_id: 1,
@@ -650,7 +637,7 @@ mod tests {
                 ),
             },
         );
-        let result = expr.evaluate(&mut context).await;
+        let result = expr.evaluate(&mut env).await;
         match result {
             Value::Int(n) => assert_eq!(n, 20),
             _ => panic!("Expected Value::Int(20)"),
@@ -659,7 +646,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_evaluate_slice_expr_out_of_bounds_get_simulated_spanned_info() {
-        let mut context = EvaluationContext::default();
+        let mut env = Env::default();
         let expr = Spanned::new(
             Span {
                 file_id: 1,
@@ -725,7 +712,7 @@ mod tests {
                 ),
             },
         );
-        let result = expr.evaluate(&mut context).await;
+        let result = expr.evaluate(&mut env).await;
         match result {
             Value::Error(Spanned {
                              span,

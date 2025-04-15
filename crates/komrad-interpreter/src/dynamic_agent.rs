@@ -3,7 +3,7 @@ use indexmap::IndexMap;
 use std::sync::Arc;
 use tracing::{debug, error, info, trace};
 
-use komrad_core::{Agent, AgentLifecycle, Block, Channel, Destructure, DestructureResult, Env, Evaluate, EvaluationContext, Message, MessageHandler, PatternDestructure, Value};
+use komrad_core::{Agent, AgentLifecycle, Block, Channel, Destructure, DestructureResult, Env, Evaluate, Message, MessageHandler, PatternDestructure, ToSExpr, Value};
 use komrad_macros::Agent;
 
 /// A DynamicAgent that, when initialized, evaluates its associated block
@@ -43,12 +43,13 @@ impl AgentLifecycle for DynamicAgent {
         // Evaluate the block in the environment to load handlers, etc.
         // Typically, the block is a series of statements that define
         // patterns, variables, or do side effects.
-        let mut ctx = EvaluationContext {
-            env: self.env.clone()
-        };
+
+        let mut initializer_result = Value::Null;
         for stmt in &self.block.0 {
-            stmt.evaluate(&mut ctx).await;
+            initializer_result = stmt.evaluate(&mut self.env).await;
+            debug!("DynamicAgent block stmt: {:?} => {:?}", stmt.to_sexpr(), initializer_result.to_sexpr());
         }
+        debug!("DynamicAgent block result: {:?}", initializer_result.to_sexpr());
 
         // Apply additional initializer bindings (like the old system).
         for (key, value) in initializer_map {
@@ -57,11 +58,11 @@ impl AgentLifecycle for DynamicAgent {
 
         // Debug output
         for handler in self.env.handlers().await {
-            debug!("Loaded handler: {:?}", handler.pattern.value);
+            debug!("Handler: {:?}", handler.pattern.value.to_sexpr());
         }
         let bindings = self.env.bindings().await;
         for (k, v) in bindings.iter() {
-            debug!("Binding: {} => {:?}", k, v);
+            debug!("Binding: {} => {:?}", k, v.to_sexpr());
         }
     }
 
@@ -72,7 +73,7 @@ impl AgentLifecycle for DynamicAgent {
         // That triggers any handler matching ["start"], etc.
         let start_msg = Message::new(Value::List(vec![Value::Word("start".to_string())]), None);
         let reply = self.on_message(&start_msg).await;
-        info!("DynamicAgent on_start; forced 'start' message => {:?}", reply);
+        info!("DynamicAgent on_start; forced 'start' message => {:?}", reply.to_sexpr());
     }
 
     async fn on_stop(&mut self) {
@@ -112,8 +113,7 @@ impl MessageHandler for DynamicAgent {
                     }
 
                     // Evaluate the handler's expression. In your new AST, that’s `handler.expr`.
-                    let mut ctx = EvaluationContext { env: child_env };
-                    let result = handler.expr.evaluate(&mut ctx).await;
+                    let result = handler.expr.evaluate(&mut self.env).await;
                     return Some(result);
                 }
                 DestructureResult::NoMatch => {

@@ -19,6 +19,15 @@ pub enum Command {
         /// Optional file to load on startup.
         file: Option<PathBuf>,
     },
+
+    /// Run in non-interactive mode.
+    Run {
+        /// The file to run.
+        file: PathBuf,
+
+        #[clap(short, long)]
+        wait: bool,
+    },
 }
 
 /// Provide a default value for the Command enum.
@@ -45,7 +54,12 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Command::Repl { file } => {
             // Call your REPL function.
             // Here we pass an `Option<&PathBuf>`. Modify your repl::main accordingly if needed.
-            crate::repl::main(interpreter, file).await?;
+            crate::repl::main(interpreter, &file).await?;
+        }
+        Command::Run { file, wait } => {
+            // Call your run function.
+            // Here we pass a `&PathBuf`. Modify your run::main accordingly if needed.
+            crate::run::main(interpreter, &file, wait).await;
         }
     }
     Ok(())

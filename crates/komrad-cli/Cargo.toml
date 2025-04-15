@@ -10,7 +10,7 @@ komrad-interpreter = { path = "../komrad-interpreter" }
 
 uuid.workspace = true
 clap = { version = "4.5.36", features = ["derive"] }
-ratatui = { version = "0.29", features = ["macros", "palette", "all-widgets", "crossterm"] }
+ratatui = { version = "0.29", features = ["macros", "palette", "all-widgets", "crossterm", "scrolling-regions"] }
 tui-logger = { version = "0.17.1", features = ["tracing-support", "crossterm", "formatter"] }
 tui-textarea = { version = "0.7.0", features = ["ratatui", "crossterm", "arbitrary"] }
 tokio.workspace = true
