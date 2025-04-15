@@ -9,3 +9,5 @@ komrad-macros = { path = "../komrad-macros" }
 komrad-parser = { path = "../komrad-parser" }
 tokio.workspace = true
 async-trait.workspace = true
+indexmap.workspace = true
+tracing.workspace = true

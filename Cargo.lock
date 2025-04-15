@@ -686,10 +686,12 @@ name = "komrad-interpreter"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "indexmap",
  "komrad-core",
  "komrad-macros",
  "komrad-parser",
  "tokio",
+ "tracing",
 ]
 
 [[package]]

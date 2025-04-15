@@ -262,6 +262,10 @@ impl ToSExpr for Value {
         match self {
             Null => SExpr::Atom("null".to_string()),
             Error(e) => SExpr::List(vec![SExpr::Atom("Error".to_string()), e.to_sexpr()]),
+            RemoteError(e) => SExpr::List(vec![
+                SExpr::Atom("RemoteError".to_string()),
+                SExpr::Atom(e.to_string()),
+            ]),
             Channel(c) => SExpr::List(vec![
                 SExpr::Atom("Channel".to_string()),
                 SExpr::Atom(format!("{:?}", c)),

@@ -22,6 +22,7 @@ pub enum Value {
     Uuid(uuid::Uuid),
     /// Represents a sequence of statements, often used as a closure or handler body.
     Block(Arc<Block>),
+    RemoteError(String),
 }
 
 impl From<Channel> for Value {

@@ -16,6 +16,7 @@ pub use agent::*;
 pub use ast::*;
 pub use channel::*;
 pub use codemap::*;
+pub use destructure::*;
 pub use env::*;
 pub use error::*;
 pub use evaluator::*;

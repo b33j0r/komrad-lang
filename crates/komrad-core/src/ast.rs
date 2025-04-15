@@ -16,7 +16,6 @@ pub struct Span {
     pub end: usize,
 }
 
-#[cfg(test)]
 impl Default for Span {
     fn default() -> Self {
         Span {
