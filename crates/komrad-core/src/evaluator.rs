@@ -1,8 +1,6 @@
-use crate::ast::{
-    AssignmentTarget, Expr, Operator, RuntimeError, Spanned, Statement, Value,
-};
-use crate::env::Env;
 use crate::AsSpanned;
+use crate::ast::{AssignmentTarget, Expr, Operator, RuntimeError, Spanned, Statement, Value};
+use crate::env::Env;
 use async_trait::async_trait;
 use indexmap::IndexMap;
 use std::future::Future;
@@ -45,15 +43,13 @@ impl Evaluate for Spanned<Expr> {
             Expr::Value(sp_val) => {
                 match sp_val.value.as_ref() {
                     // If it's a variable ("Word"), look it up.
-                    Value::Word(name) => {
-                        match context.env.get(name).await {
-                            Some(v) => v,
-                            None => Value::Error(
-                                RuntimeError::ArgumentError(format!("Undefined variable: {}", name))
-                                    .as_spanned(sp_val.span.clone()),
-                            ),
-                        }
-                    }
+                    Value::Word(name) => match context.env.get(name).await {
+                        Some(v) => v,
+                        None => Value::Error(
+                            RuntimeError::ArgumentError(format!("Undefined variable: {}", name))
+                                .as_spanned(sp_val.span.clone()),
+                        ),
+                    },
                     // Otherwise, propagate the literal.
                     other => other.clone(),
                 }
@@ -96,8 +92,10 @@ impl Evaluate for Spanned<Expr> {
                     Operator::Multiply => match (left, right) {
                         (Value::Int(a), Value::Int(b)) => Value::Int(a * b),
                         _ => Value::Error(
-                            RuntimeError::ArgumentError("Type mismatch in multiplication".to_string())
-                                .as_spanned(rhs.span.clone()),
+                            RuntimeError::ArgumentError(
+                                "Type mismatch in multiplication".to_string(),
+                            )
+                            .as_spanned(rhs.span.clone()),
                         ),
                     },
                     Operator::Divide => match (left, right) {
@@ -186,9 +184,7 @@ impl Evaluate for Spanned<Statement> {
                         RuntimeError::ArgumentError("Assignment pattern mismatch".into())
                             .as_spanned(target.span.clone()),
                     ),
-                    DestructureResult::Err(e) => {
-                        Value::Error(e.as_spanned(target.span.clone()))
-                    }
+                    DestructureResult::Err(e) => Value::Error(e.as_spanned(target.span.clone())),
                 }
             }
             Statement::Tell { target, value } => {
@@ -252,7 +248,7 @@ async fn apply_assignment_actions(
                                     RuntimeError::ArgumentError(
                                         "Only single-index slice assignment supported".into(),
                                     )
-                                        .as_spanned(target_span.clone()),
+                                    .as_spanned(target_span.clone()),
                                 );
                             }
                             if let Value::Int(i) = indices[0].clone() {
@@ -261,7 +257,7 @@ async fn apply_assignment_actions(
                                         RuntimeError::ArgumentError(
                                             "Index out of bounds in slice assignment".into(),
                                         )
-                                            .as_spanned(target_span.clone()),
+                                        .as_spanned(target_span.clone()),
                                     );
                                 }
                                 vs[i as usize] = value;
@@ -278,8 +274,8 @@ async fn apply_assignment_actions(
                                 RuntimeError::ArgumentError(
                                     "Target for slice assignment is not a list".into(),
                                 )
-                                    .as_spanned(target_span.clone()),
-                            )
+                                .as_spanned(target_span.clone()),
+                            );
                         }
                     }
                 } else {
@@ -301,13 +297,14 @@ async fn apply_assignment_actions(
 fn get_target_value<'a>(
     target: &'a Spanned<AssignmentTarget>,
     context: &'a mut EvaluationContext,
-) -> Pin<Box<dyn Future<Output=Value> + Send + 'a>> {
+) -> Pin<Box<dyn Future<Output = Value> + Send + 'a>> {
     Box::pin(async move {
         match target.value.as_ref() {
-            AssignmentTarget::Variable(name) => {
-                context.env.get(name).await.unwrap_or(Value::Null)
-            }
-            AssignmentTarget::Slice { target: slice_target, index } => {
+            AssignmentTarget::Variable(name) => context.env.get(name).await.unwrap_or(Value::Null),
+            AssignmentTarget::Slice {
+                target: slice_target,
+                index,
+            } => {
                 let container_val = get_target_value(slice_target, context).await;
                 let idx_val = index.evaluate(context).await;
                 match (container_val, idx_val) {
@@ -330,14 +327,17 @@ fn set_target_value<'a>(
     target: &'a Spanned<AssignmentTarget>,
     new_val: Value,
     context: &'a mut EvaluationContext,
-) -> Pin<Box<dyn Future<Output=Value> + Send + 'a>> {
+) -> Pin<Box<dyn Future<Output = Value> + Send + 'a>> {
     Box::pin(async move {
         match target.value.as_ref() {
             AssignmentTarget::Variable(name) => {
                 context.env.set(name, new_val.clone()).await;
                 new_val
             }
-            AssignmentTarget::Slice { target: slice_target, index } => {
+            AssignmentTarget::Slice {
+                target: slice_target,
+                index,
+            } => {
                 let mut container_val = get_target_value(slice_target, context).await;
                 let idx_val = index.evaluate(context).await;
                 match (container_val, idx_val) {
@@ -552,9 +552,9 @@ mod tests {
         let result = expr.evaluate(&mut context).await;
         match result {
             Value::Error(Spanned {
-                             value: box RuntimeError::ArgumentError(msg),
-                             ..
-                         }) => {
+                value: box RuntimeError::ArgumentError(msg),
+                ..
+            }) => {
                 assert_eq!(msg, "Divide by zero");
             }
             _ => panic!("Expected a division by zero error"),
@@ -707,9 +707,9 @@ mod tests {
         let result = expr.evaluate(&mut context).await;
         match result {
             Value::Error(Spanned {
-                             span,
-                             value: box RuntimeError::ArgumentError(msg),
-                         }) => {
+                span,
+                value: box RuntimeError::ArgumentError(msg),
+            }) => {
                 assert_eq!(msg, "Index out of bounds");
                 assert_eq!(span.file_id, 1);
                 assert_eq!(span.start, 2);

@@ -1,6 +1,8 @@
 #![feature(box_patterns)]
 
-use komrad_core::{CodeAtlas, Env, Evaluate, EvaluationContext, RuntimeError, Spanned, Statement, TopLevel, Value};
+use komrad_core::{
+    CodeAtlas, Env, Evaluate, EvaluationContext, RuntimeError, Spanned, Statement, TopLevel, Value,
+};
 use std::collections::HashMap;
 
 pub type InterpreterResult<T> = Result<T, RuntimeError>;
@@ -15,15 +17,15 @@ impl Interpreter {
         Self {
             codemaps: CodeAtlas::new(),
             evaluation_context: EvaluationContext {
-                env: Env::new(
-                    HashMap::new(),
-                    Vec::new(),
-                )
+                env: Env::new(HashMap::new(), Vec::new()),
             },
         }
     }
 
-    pub async fn run_statement(&mut self, statement: Spanned<Statement>) -> InterpreterResult<Value> {
+    pub async fn run_statement(
+        &mut self,
+        statement: Spanned<Statement>,
+    ) -> InterpreterResult<Value> {
         let result = statement.evaluate(&mut self.evaluation_context).await;
         Ok(result)
     }
@@ -42,9 +44,7 @@ impl Interpreter {
                 }
                 Ok(result)
             }
-            TopLevel::Statement(statement) => {
-                self.run_statement(statement).await
-            }
+            TopLevel::Statement(statement) => self.run_statement(statement).await,
         }
     }
 }

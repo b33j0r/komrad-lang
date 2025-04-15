@@ -8,15 +8,15 @@ use ratatui::crossterm::event::{
 };
 use ratatui::crossterm::{
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use ratatui::prelude::{Line, Stylize};
 use ratatui::{
+    Terminal,
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
     style::{Color, Style},
     widgets::{Block, Borders},
-    Terminal,
 };
 use std::{error::Error, io, thread, time::Duration};
 use tokio::{select, sync::mpsc, time};
@@ -59,7 +59,10 @@ fn spawn_blocking_event_reader(tx: mpsc::Sender<CrosstermEvent>, shutdown: Cance
 }
 
 /// Interpreter hook.
-async fn interpret_input(input: &str, interpreter: &mut Interpreter) -> Result<String, Box<dyn Error>> {
+async fn interpret_input(
+    input: &str,
+    interpreter: &mut Interpreter,
+) -> Result<String, Box<dyn Error>> {
     let mut codemaps = komrad_core::CodeAtlas::new();
     let top_level = parse_snippet_complete(&mut codemaps, input)
         .map_err(|e| format!("Parse error: {:?}", e))?;
@@ -181,12 +184,22 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
                 .split(f.area());
 
             let logger_widget = TuiLoggerWidget::default()
-                .block(Block::default().fg(Color::LightBlue).borders(Borders::ALL).title(""))
+                .block(
+                    Block::default()
+                        .fg(Color::LightBlue)
+                        .borders(Borders::ALL)
+                        .title(""),
+                )
                 .formatter(log_formatter)
                 .state(&mut logger_state);
             f.render_widget(logger_widget, chunks[0]);
 
-            input_area.set_block(Block::default().fg(Color::LightMagenta).borders(Borders::ALL).title(""));
+            input_area.set_block(
+                Block::default()
+                    .fg(Color::LightMagenta)
+                    .borders(Borders::ALL)
+                    .title(""),
+            );
             input_area.set_style(Style::default().fg(Color::LightGreen));
             f.render_widget(&input_area, chunks[1]);
         })?;

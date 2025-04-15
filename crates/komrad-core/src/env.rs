@@ -236,7 +236,7 @@ mod tests {
                 Expr::Value(Spanned::new(crate::ast::Span::default(), Value::Int(100))),
             ),
         }))
-            .await;
+        .await;
 
         // Clone a child environment
         let mut child_env = env.clone_handler_scope().await;
