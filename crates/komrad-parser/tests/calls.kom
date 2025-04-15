@@ -1,0 +1,13 @@
+==== call ask with one argument
+a = foo bar
+
+----
+(Block (Assign (Variable a) (Ask foo (List bar))))
+
+
+==== call ask with binary expression
+
+a = foo bar + baz
+
+----
+(Block (Assign (Variable a) (Ask foo (List (BinaryExpr bar + baz)))))
