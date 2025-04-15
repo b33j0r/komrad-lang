@@ -16,3 +16,11 @@ foo
 
 ----
 (Block "foo")
+
+
+==== value string empty
+""
+
+
+----
+(Block "")
