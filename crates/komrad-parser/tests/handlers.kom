@@ -6,3 +6,25 @@
 
 ----
 (Block (Handler (HandlerStruct (PatternList (ValueMatch parse) (ValueMatch a) (ValueMatch handler)) (Block (Assign (Variable a) 1) (Assign (Variable b) 2)))))
+
+
+==== handler with statements and a comment
+[parse a handler] {
+	a = 1
+	b = 2
+	# This is a comment
+}
+
+----
+(Block (Handler (HandlerStruct (PatternList (ValueMatch parse) (ValueMatch a) (ValueMatch handler)) (Block (Assign (Variable a) 1) (Assign (Variable b) 2) (Comment "This is a comment")))))
+
+==== handler inside a block
+X = {
+	[parse a handler] {
+		a = 1
+		b = 2
+	}
+}
+
+----
+(Block (Assign (Variable X) (Block (Handler (HandlerStruct (PatternList (ValueMatch parse) (ValueMatch a) (ValueMatch handler)) (Block (Assign (Variable a) 1) (Assign (Variable b) 2)))))))
