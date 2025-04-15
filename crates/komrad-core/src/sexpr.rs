@@ -1,5 +1,5 @@
 use crate::ast::{
-    AssignmentTarget, Block, Expr, Handler, Operator, Pattern, Predicate, Statement, Type, Value,
+    AssignmentTarget, Block, Expr, Handler, Operator, Pattern, Predicate, Statement,
 };
 use crate::{RuntimeError, Spanned, TopLevel};
 use std::fmt::Debug;
@@ -254,7 +254,7 @@ impl ToSExpr for Expr {
 
 impl ToSExpr for Value {
     fn to_sexpr(&self) -> SExpr {
-        use Value::*;
+        use crate::value::Value::*;
         match self {
             Null => SExpr::Atom("null".to_string()),
             Error(e) => SExpr::List(vec![SExpr::Atom("Error".to_string()), e.to_sexpr()]),
@@ -457,6 +457,7 @@ impl ToSExpr for Vec<Spanned<Statement>> {
 // SExpr Parser Logic (unchanged, except we store raw strings in SExpr::Atom).
 // ----------------------------------------------------------------------------
 
+use crate::value::{Type, Value};
 use nom::branch::alt;
 use nom::bytes::complete::{escaped_transform, is_not, take_while1};
 use nom::character::complete::{char, multispace0, multispace1};
@@ -504,7 +505,7 @@ fn parse_list(input: SParserSpan) -> SResult<SExpr> {
         ),
         char(')'),
     )
-    .parse(input)
+        .parse(input)
 }
 
 /// Parse a double-quoted string. Basic escapes: \" \\ \n \r \t

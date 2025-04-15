@@ -1,5 +1,6 @@
 use async_trait::async_trait;
-use komrad_core::{Agent, AgentLifecycle, Channel, Message, MessageHandler, Value};
+use komrad_core::value::Value;
+use komrad_core::{Agent, AgentLifecycle, Channel, Message, MessageHandler};
 use komrad_macros::{Agent, AgentMessage};
 use std::sync::Arc;
 use tokio::sync::RwLock;

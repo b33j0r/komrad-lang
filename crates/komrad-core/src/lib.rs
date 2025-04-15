@@ -9,6 +9,7 @@ mod destructure;
 mod env;
 mod evaluator;
 mod sexpr;
+mod value;
 
 pub use agent::*;
 pub use ast::*;
@@ -17,3 +18,4 @@ pub use codemap::*;
 pub use env::*;
 pub use evaluator::*;
 pub use sexpr::*;
+pub use value::*;

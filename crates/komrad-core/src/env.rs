@@ -1,4 +1,5 @@
-use crate::ast::{Handler, Value};
+use crate::ast::Handler;
+use crate::value::Value;
 use indexmap::IndexMap;
 use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
@@ -168,7 +169,8 @@ impl Default for Scope {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ast::{Block, Expr, Pattern, Spanned, Value};
+    use crate::ast::{Block, Expr, Pattern, Spanned};
+    use crate::value::Value;
     use std::collections::HashMap;
 
     #[tokio::test]
@@ -236,7 +238,7 @@ mod tests {
                 Expr::Value(Spanned::new(crate::ast::Span::default(), Value::Int(100))),
             ),
         }))
-        .await;
+            .await;
 
         // Clone a child environment
         let mut child_env = env.clone_handler_scope().await;

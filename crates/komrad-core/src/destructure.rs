@@ -1,5 +1,6 @@
 use crate::ast::Pattern;
-use crate::{Expr, Operator, Predicate, RuntimeError, Spanned, Value};
+use crate::value::Value;
+use crate::{Expr, Operator, Predicate, RuntimeError, Spanned};
 use std::collections::HashMap;
 
 /// Match result type for destructuring:
@@ -323,7 +324,8 @@ fn eval_index(expr: &Spanned<Expr>) -> Result<Value, RuntimeError> {
 #[cfg(test)]
 mod tests_assignment {
     use super::*;
-    use crate::ast::{AssignmentTarget, Expr, Span, Spanned, Value};
+    use crate::ast::{AssignmentTarget, Expr, Span, Spanned};
+    use crate::value::Value;
 
     fn dummy_span() -> Span {
         Span {

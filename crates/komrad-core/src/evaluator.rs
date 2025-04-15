@@ -1,6 +1,6 @@
-use crate::AsSpanned;
-use crate::ast::{AssignmentTarget, Expr, Operator, RuntimeError, Spanned, Statement, Value};
+use crate::ast::{AssignmentTarget, Expr, Operator, RuntimeError, Spanned, Statement};
 use crate::env::Env;
+use crate::AsSpanned;
 use async_trait::async_trait;
 use indexmap::IndexMap;
 use std::future::Future;
@@ -8,6 +8,7 @@ use std::pin::Pin;
 
 // Reuse the destructuring module for assignments.
 use crate::destructure::{AssignmentAction, AssignmentDestructure, Destructure, DestructureResult};
+use crate::value::Value;
 
 #[allow(dead_code)]
 pub struct EvaluationContext {
@@ -95,7 +96,7 @@ impl Evaluate for Spanned<Expr> {
                             RuntimeError::ArgumentError(
                                 "Type mismatch in multiplication".to_string(),
                             )
-                            .as_spanned(rhs.span.clone()),
+                                .as_spanned(rhs.span.clone()),
                         ),
                     },
                     Operator::Divide => match (left, right) {
@@ -248,7 +249,7 @@ async fn apply_assignment_actions(
                                     RuntimeError::ArgumentError(
                                         "Only single-index slice assignment supported".into(),
                                     )
-                                    .as_spanned(target_span.clone()),
+                                        .as_spanned(target_span.clone()),
                                 );
                             }
                             if let Value::Int(i) = indices[0].clone() {
@@ -257,7 +258,7 @@ async fn apply_assignment_actions(
                                         RuntimeError::ArgumentError(
                                             "Index out of bounds in slice assignment".into(),
                                         )
-                                        .as_spanned(target_span.clone()),
+                                            .as_spanned(target_span.clone()),
                                     );
                                 }
                                 vs[i as usize] = value;
@@ -274,7 +275,7 @@ async fn apply_assignment_actions(
                                 RuntimeError::ArgumentError(
                                     "Target for slice assignment is not a list".into(),
                                 )
-                                .as_spanned(target_span.clone()),
+                                    .as_spanned(target_span.clone()),
                             );
                         }
                     }
@@ -297,7 +298,7 @@ async fn apply_assignment_actions(
 fn get_target_value<'a>(
     target: &'a Spanned<AssignmentTarget>,
     context: &'a mut EvaluationContext,
-) -> Pin<Box<dyn Future<Output = Value> + Send + 'a>> {
+) -> Pin<Box<dyn Future<Output=Value> + Send + 'a>> {
     Box::pin(async move {
         match target.value.as_ref() {
             AssignmentTarget::Variable(name) => context.env.get(name).await.unwrap_or(Value::Null),
@@ -327,7 +328,7 @@ fn set_target_value<'a>(
     target: &'a Spanned<AssignmentTarget>,
     new_val: Value,
     context: &'a mut EvaluationContext,
-) -> Pin<Box<dyn Future<Output = Value> + Send + 'a>> {
+) -> Pin<Box<dyn Future<Output=Value> + Send + 'a>> {
     Box::pin(async move {
         match target.value.as_ref() {
             AssignmentTarget::Variable(name) => {
@@ -360,7 +361,8 @@ fn set_target_value<'a>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ast::{Operator, Span, Spanned, Value as AstValue};
+    use crate::ast::{Operator, Span, Spanned};
+    use crate::value::Value as AstValue;
 
     #[tokio::test]
     async fn test_evaluate_value() {
@@ -552,9 +554,9 @@ mod tests {
         let result = expr.evaluate(&mut context).await;
         match result {
             Value::Error(Spanned {
-                value: box RuntimeError::ArgumentError(msg),
-                ..
-            }) => {
+                             value: box RuntimeError::ArgumentError(msg),
+                             ..
+                         }) => {
                 assert_eq!(msg, "Divide by zero");
             }
             _ => panic!("Expected a division by zero error"),
@@ -707,9 +709,9 @@ mod tests {
         let result = expr.evaluate(&mut context).await;
         match result {
             Value::Error(Spanned {
-                span,
-                value: box RuntimeError::ArgumentError(msg),
-            }) => {
+                             span,
+                             value: box RuntimeError::ArgumentError(msg),
+                         }) => {
                 assert_eq!(msg, "Index out of bounds");
                 assert_eq!(span.file_id, 1);
                 assert_eq!(span.start, 2);

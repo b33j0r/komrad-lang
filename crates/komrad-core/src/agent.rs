@@ -1,6 +1,6 @@
-use crate::ast::Value;
 use crate::channel::{Channel, ChannelListener, ControlMessage, Message};
 use crate::env::Env;
+use crate::value::Value;
 use async_trait::async_trait;
 use indexmap::IndexMap;
 use std::sync::Arc;
@@ -23,7 +23,7 @@ pub trait Agent: MessageHandler + AgentLifecycle {
     fn spawn(self) -> Channel;
 
     fn spawn_with_initializer(self: Box<Self>, initializer_map: IndexMap<String, Value>)
-    -> Channel;
+                              -> Channel;
 
     async fn run(
         &mut self,

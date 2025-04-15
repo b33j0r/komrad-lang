@@ -8,15 +8,15 @@ use ratatui::crossterm::event::{
 };
 use ratatui::crossterm::{
     execute,
-    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::prelude::{Line, Stylize};
 use ratatui::{
-    Terminal,
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
     style::{Color, Style},
     widgets::{Block, Borders},
+    Terminal,
 };
 use std::{error::Error, io, thread, time::Duration};
 use tokio::{select, sync::mpsc, time};

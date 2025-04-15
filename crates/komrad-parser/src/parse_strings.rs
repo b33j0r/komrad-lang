@@ -1,11 +1,12 @@
 use crate::result::PResult;
 use crate::spanned::spanned;
-use komrad_core::{ParserSpan, Spanned, Value};
-use nom::Parser;
+use komrad_core::Value;
+use komrad_core::{ParserSpan, Spanned};
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take_till1};
 use nom::combinator::map;
 use nom::multi::fold_many0;
+use nom::Parser;
 
 /// Parses a single, double, or triple quoted string.
 pub fn parse_string(input: ParserSpan) -> PResult<String> {
@@ -15,7 +16,7 @@ pub fn parse_string(input: ParserSpan) -> PResult<String> {
         parse_double_quoted_string,
         parse_single_quoted_string,
     ))
-    .parse(input)
+        .parse(input)
 }
 
 pub fn parse_empty_string(input: ParserSpan) -> PResult<String> {
@@ -95,7 +96,7 @@ pub fn parse_triple_string_inner(input: ParserSpan) -> PResult<String> {
             acc
         },
     )
-    .parse(input)
+        .parse(input)
 }
 
 /// Parses an escape sequence (e.g. `\n`, `\t`, `\\`).

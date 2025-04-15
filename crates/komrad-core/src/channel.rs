@@ -1,6 +1,7 @@
-use crate::ast::{RuntimeError, Value};
+use crate::ast::RuntimeError;
+use crate::value::Value;
 use std::sync::Arc;
-use tokio::sync::{Mutex, mpsc};
+use tokio::sync::{mpsc, Mutex};
 
 const CHANNEL_CAPACITY_MSG: usize = 64;
 const CHANNEL_CAPACITY_CTL: usize = 8;
@@ -159,7 +160,7 @@ impl ChannelListener {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ast::Value;
+    use crate::value::Value;
 
     #[tokio::test]
     async fn test_channel_send_recv() {
