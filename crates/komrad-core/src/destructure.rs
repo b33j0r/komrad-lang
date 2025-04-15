@@ -158,6 +158,15 @@ fn apply_operator(lhs: &Value, op: &Operator, rhs: &Value) -> Result<Value, Runt
                 "Multiply operator requires numeric operands".to_string(),
             )),
         },
+        Operator::Mod => match (lhs, rhs) {
+            (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a % b)),
+            (Value::Int(a), Value::Float(b)) => Ok(Value::Float((*a as f64) % b)),
+            (Value::Float(a), Value::Int(b)) => Ok(Value::Float(a % (*b as f64))),
+            (Value::Float(a), Value::Float(b)) => Ok(Value::Float(a % b)),
+            _ => Err(RuntimeError::TypeError(
+                "Mod operator requires numeric operands".to_string(),
+            )),
+        },
         Operator::Divide => {
             // Check for division by zero in any numeric combination.
             match (lhs, rhs) {

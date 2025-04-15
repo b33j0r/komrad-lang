@@ -297,6 +297,7 @@ impl ToSExpr for Operator {
             Operator::Subtract => "-",
             Operator::Multiply => "*",
             Operator::Divide => "/",
+            Operator::Mod => "%",
             Operator::Equal => "==",
             Operator::NotEqual => "!=",
             Operator::GreaterThan => ">",

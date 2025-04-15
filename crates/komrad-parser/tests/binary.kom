@@ -1,0 +1,17 @@
+==== binary add
+a = 1 + 2
+
+----
+(Block (Assign (Variable a) (BinaryExpr 1 + 2)))
+
+==== binary add chained
+a = 1 + 2 + 3
+
+----
+(Block (Assign (Variable a) (BinaryExpr (BinaryExpr 1 + 2) + 3)))
+
+==== binary add chained with parentheses
+a = 1 + (2 + 3)
+
+----
+(Block (Assign (Variable a) (BinaryExpr 1 + (BinaryExpr 2 + 3))))

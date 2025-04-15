@@ -3,17 +3,15 @@
 use crate::parse_strings::parse_string_value;
 use crate::result::PResult;
 use crate::spanned;
-use komrad_core::Handler;
 use komrad_core::Value;
+use komrad_core::{AsSpanned, Associativity, Handler};
 use komrad_core::{AssignmentTarget, Block, CodeAtlas, ParserSpan, TopLevel};
 use komrad_core::{Expr, Statement};
 use komrad_core::{Operator, Span, Spanned};
 use komrad_core::{ParseError, Pattern};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
-use nom::character::complete::{
-    alpha1, char, line_ending, multispace0, multispace1, not_line_ending, space0,
-};
+use nom::character::complete::{alpha1, char, line_ending, multispace0, multispace1, not_line_ending, space0, space1};
 use nom::combinator::{map, opt};
 use nom::multi::{many0, many1, separated_list0, separated_list1};
 use nom::sequence::{delimited, pair, preceded};
@@ -349,7 +347,6 @@ fn parse_expr_statement(input: ParserSpan) -> PResult<Spanned<Statement>> {
 // --------------------------------------------
 pub fn parse_expression(input: ParserSpan) -> PResult<Spanned<Expr>> {
     alt((
-        parse_block_or_dict,
         parse_binary_expression,
         parse_expr_toplevel,
     ))
@@ -360,6 +357,7 @@ pub fn parse_expression(input: ParserSpan) -> PResult<Spanned<Expr>> {
 fn parse_expr_toplevel(input: ParserSpan) -> PResult<Spanned<Expr>> {
     alt((
         parse_list_expr,
+        parse_block_or_dict,
         parse_string_expr,
         parse_number_value.map(|sp_val| Spanned::new(sp_val.span.clone(), Expr::Value(sp_val))),
         parse_identifier_value.map(|sp_val| Spanned::new(sp_val.span.clone(), Expr::Value(sp_val))),
@@ -404,27 +402,81 @@ fn parse_list_expr(input: ParserSpan) -> PResult<Spanned<Expr>> {
 /// The overall span of the binary expression is the range from the start of the left
 /// sub-expression to the end of the right sub-expression.
 fn parse_binary_expression(input: ParserSpan) -> PResult<Spanned<Expr>> {
-    let start = input.clone();
-    let (i, left) = (parse_expr_toplevel).parse(input)?;
-    let (i, op) = delimited(space0, parse_binary_operator, space0).parse(i)?;
-    let (i, right) = parse_expr_toplevel.parse(i)?;
-
-    let span = Span {
-        file_id: start.extra.file_id,
-        start: start.location_offset(),
-        end: i.location_offset(),
-    };
-    Ok((
-        i,
-        Spanned::new(
-            span,
-            Expr::BinaryExpr {
-                lhs: left,
-                op,
-                rhs: right,
-            },
-        ),
+    // 1) parse operator expression
+    let (i, expr) = parse_precedence_expression(0).parse(input)?;
+    // 2) parse optional "call suffix"
+    let (i, args_opt) = opt(preceded(
+        space1,
+        separated_list1(space1, parse_precedence_expression(0)),
     ))
+        .parse(i)?;
+    if let Some(args) = args_opt {
+        // We have a call with multiple arguments
+        let span = Span {
+            file_id: expr.span.file_id,
+            start: expr.span.start,
+            end: args.last().unwrap().span.end,
+        };
+        let args_span = Span {
+            file_id: expr.span.file_id,
+            start: args.first().unwrap().span.start,
+            end: args.last().unwrap().span.end,
+        };
+        Ok((
+            i,
+            Expr::Ask {
+                target: expr,
+                value: Expr::List {
+                    elements: args,
+                }.as_spanned(args_span),
+            }.as_spanned(span)
+        ))
+    } else {
+        Ok((i, expr))
+    }
+}
+
+fn parse_precedence_expression(min_prec: u8) -> impl Fn(ParserSpan) -> PResult<Spanned<Expr>> {
+    move |i: ParserSpan| {
+        // parse a "primary"
+        let (mut i2, mut lhs) = parse_expr_toplevel(i)?;
+        // loop while next operator has prec >= min_prec
+        loop {
+            let op_res = delimited(
+                multispace0,
+                parse_binary_operator,
+                multispace0,
+            ).parse(i2.clone());
+            match op_res {
+                Ok((i3, op)) => {
+                    let prec = op.precedence();
+                    if prec < min_prec {
+                        break;
+                    }
+                    let next_min = match op.associativity() {
+                        Associativity::Left => prec + 1,
+                        Associativity::Right => prec,
+                        Associativity::None => prec,
+                    };
+                    let (i4, rhs) = parse_precedence_expression(next_min)(i3)?;
+                    lhs = Expr::BinaryExpr {
+                        lhs: lhs.clone(),
+                        op,
+                        rhs: rhs.clone(),
+                    }.as_spanned(
+                        Span {
+                            file_id: lhs.span.file_id,
+                            start: lhs.span.start,
+                            end: rhs.span.end,
+                        }
+                    );
+                    i2 = i4;
+                }
+                Err(_) => break,
+            }
+        }
+        Ok((i2, lhs))
+    }
 }
 
 // --------------------------------------------
@@ -500,6 +552,7 @@ fn parse_binary_operator(input: ParserSpan) -> IResult<ParserSpan, Spanned<Opera
             map(parse_tag("-"), |_| Operator::Subtract),
             map(parse_tag("*"), |_| Operator::Multiply),
             map(parse_tag("/"), |_| Operator::Divide),
+            map(parse_tag("%"), |_| Operator::Mod),
             map(parse_tag("=="), |_| Operator::Equal),
             map(parse_tag("!="), |_| Operator::NotEqual),
             map(parse_tag(">"), |_| Operator::GreaterThan),
@@ -749,7 +802,7 @@ pub mod parser_tests {
     #[test]
     fn test_incomplete_error() {
         // Test that extra (unparsed) input yields an Incomplete error.
-        let input = "123 extra";
+        let input = "123 = /";
         let result = parse_complete(input);
         assert!(result.is_err());
 
@@ -758,7 +811,7 @@ pub mod parser_tests {
                 ParseError::Incomplete { remaining, .. } => {
                     // The parser should stop at the " extra" part.
                     // Note that multispace at beginning of the leftover may be trimmed.
-                    assert_eq!(remaining.trim(), "extra");
+                    assert_eq!(remaining.trim(), "= /");
                 }
                 _ => panic!("Expected an Incomplete error variant"),
             }

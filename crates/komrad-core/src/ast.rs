@@ -167,27 +167,69 @@ pub enum Operator {
     Subtract,
     Multiply,
     Divide,
+    Mod,
     Equal,
     NotEqual,
     GreaterThan,
     LessThan,
 }
 
+/// Represents the associativity of an operator.
+///
+/// Associativity determines how operators of the same precedence are grouped
+/// in the absence of parentheses. For example, in the expression `a - b - c`,
+/// the subtraction operator is left associative, so it is grouped as `(a - b) - c`.
+///
+/// In the parser, this works by checking the associativity of the operator when
+/// parsing expressions. If two operators have the same precedence, the associativity
+/// is used to determine which operator to apply first as follows:
+///
+/// - Left associative: The leftmost operator is applied first.
+/// - Right associative: The rightmost operator is applied first.
+/// - None: The operators are not grouped together and are treated as separate operations.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Associativity {
+    Left,
+    Right,
+    None,
+}
+
+impl Operator {
+    /// Get the associativity of the operator.
+    ///
+    /// The associativity is used to determine how operators of the same precedence
+    /// are grouped in the absence of parentheses.
+    pub fn associativity(&self) -> Associativity {
+        use Operator::*;
+        match self {
+            Add | Subtract => Associativity::Left,
+            Mod | Multiply | Divide => Associativity::Left,
+            Equal | NotEqual | GreaterThan | LessThan => Associativity::None,
+        }
+    }
+
+    /// Get the precedence of the operator.
+    ///
+    /// The precedence is used to determine the order of operations in expressions.
+    pub fn precedence(&self) -> u8 {
+        use Operator::*;
+        match self {
+            Add | Subtract => 1,
+            Multiply | Divide => 2,
+            Mod => 3,
+            Equal | NotEqual => 4,
+            GreaterThan | LessThan => 5,
+        }
+    }
+}
+
 impl PartialOrd for Operator {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        use Operator::*;
-        // Define precedence for operators
-        let precedence = match self {
-            Add | Subtract => 1,
-            Multiply | Divide => 2,
-            Equal | NotEqual | GreaterThan | LessThan => 3,
-        };
-        let other_precedence = match other {
-            Add | Subtract => 1,
-            Multiply | Divide => 2,
-            Equal | NotEqual | GreaterThan | LessThan => 3,
-        };
-        precedence.partial_cmp(&other_precedence)
+        if self.precedence() == other.precedence() {
+            Some(std::cmp::Ordering::Equal)
+        } else {
+            Some(self.precedence().cmp(&other.precedence()))
+        }
     }
 }
 
