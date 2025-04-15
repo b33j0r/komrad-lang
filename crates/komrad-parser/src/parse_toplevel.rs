@@ -1,5 +1,8 @@
 // parse_toplevel
 
+use crate::parse_strings::parse_string_value;
+use crate::result::PResult;
+use crate::spanned;
 use komrad_core::{AssignmentTarget, Block, CodeAtlas, ParserSpan, TopLevel};
 use komrad_core::{Expr, ParseError, Statement};
 use komrad_core::{Operator, Span, Spanned, Value};
@@ -12,38 +15,6 @@ use nom::sequence::{delimited, pair, preceded};
 use nom::{Err as NomErr, IResult, Parser};
 use std::path::PathBuf;
 use std::sync::Arc;
-
-// --------------------------------------------
-// PResult type alias.
-// --------------------------------------------
-pub type PResult<'a, T> = IResult<ParserSpan<'a>, T, ParseError>;
-
-// --------------------------------------------
-// The spanned(...) helper.
-// Wrap a parser returning a T into one returning Spanned<T> using
-// the consumed byte offsets.
-// --------------------------------------------
-fn spanned<'a, O, F>(
-    mut inner: F,
-) -> impl FnMut(ParserSpan<'a>) -> IResult<ParserSpan<'a>, Spanned<O>, ParseError>
-where
-    F: FnMut(ParserSpan<'a>) -> IResult<ParserSpan<'a>, O, ParseError>,
-{
-    move |input: ParserSpan<'a>| {
-        let start_offset = input.location_offset();
-        let file_id = input.extra.file_id;
-
-        let (remaining, value) = inner(input)?;
-        let end_offset = remaining.location_offset();
-
-        let span = Span {
-            file_id,
-            start: start_offset,
-            end: end_offset,
-        };
-        Ok((remaining, Spanned::new(span, value)))
-    }
-}
 
 // --------------------------------------------
 // Low-level wrappers for built-in combinators.
@@ -148,7 +119,7 @@ fn parse_statement(input: ParserSpan) -> PResult<Spanned<Statement>> {
 
 fn parse_tell_statement(input: ParserSpan) -> PResult<Spanned<Statement>> {
     // like `bob something 42 + 3 ok`
-    spanned(|i| {
+    spanned::spanned(|i| {
         pair(parse_call_target, preceded(space0, parse_call_args))
             .map(|(target, args)| {
                 Statement::Tell {
@@ -161,7 +132,7 @@ fn parse_tell_statement(input: ParserSpan) -> PResult<Spanned<Statement>> {
 }
 
 fn parse_call_target(input: ParserSpan) -> PResult<Spanned<Expr>> {
-    spanned(|i| {
+    spanned::spanned(|i| {
         alt((
             parse_identifier_value.map(|sp_val| {
                 Expr::Value(sp_val)
@@ -173,7 +144,7 @@ fn parse_call_target(input: ParserSpan) -> PResult<Spanned<Expr>> {
 
 fn parse_call_args(input: ParserSpan) -> PResult<Spanned<Expr>> {
     // like `something 42 + 3 ok` as an Expr::List
-    spanned(|i| {
+    spanned::spanned(|i| {
         separated_list1(space0, parse_call_arg).map(
             |args| {
                 Expr::List {
@@ -186,7 +157,7 @@ fn parse_call_args(input: ParserSpan) -> PResult<Spanned<Expr>> {
 }
 
 fn parse_call_arg(input: ParserSpan) -> PResult<Spanned<Expr>> {
-    spanned(|i| {
+    spanned::spanned(|i| {
         alt((
             parse_number_value.map(|sp_val| {
                 Expr::Value(sp_val)
@@ -201,7 +172,7 @@ fn parse_call_arg(input: ParserSpan) -> PResult<Spanned<Expr>> {
 
 /// Assignment statement: parse an assignment and return it as a Statement.
 fn parse_assignment_statement(input: ParserSpan) -> PResult<Spanned<Statement>> {
-    spanned(|i| {
+    spanned::spanned(|i| {
         pair(
             parse_assignment_target,
             preceded(preceded(space0, parse_tag("=")), preceded(space0, parse_expression)),
@@ -219,7 +190,7 @@ fn parse_assignment_statement(input: ParserSpan) -> PResult<Spanned<Statement>> 
 
 /// Assignment target: parse an identifier and return it as a Value::Word.
 fn parse_assignment_target(input: ParserSpan) -> PResult<Spanned<AssignmentTarget>> {
-    spanned(|i| {
+    spanned::spanned(|i| {
         alt((
             // Try destructuring first.
             parse_destructure_target,
@@ -284,7 +255,7 @@ mod assignment_tests {
 /// Comment line: parse a comment starting with '#' and consume all characters
 /// up to but not including the newline. Preceding whitespace is already handled.
 fn parse_comment_line(input: ParserSpan) -> PResult<Spanned<Statement>> {
-    spanned(|i| {
+    spanned::spanned(|i| {
         // Expect the comment marker immediately.
         let (i, _) = tag("#")(i)?;
         let (i, _) = space0(i)?;
@@ -298,7 +269,7 @@ fn parse_comment_line(input: ParserSpan) -> PResult<Spanned<Statement>> {
 
 /// Blank line: simply consume the line and return a Statement::BlankLine.
 fn parse_blank_line(input: ParserSpan) -> PResult<Spanned<Statement>> {
-    spanned(|i| {
+    spanned::spanned(|i| {
         let (i, _) = line_ending(i)?;
         Ok((i, Statement::BlankLine))
     })
@@ -307,7 +278,7 @@ fn parse_blank_line(input: ParserSpan) -> PResult<Spanned<Statement>> {
 
 /// Expression statement: simply parse an expression and wrap it as a Statement.
 fn parse_expr_statement(input: ParserSpan) -> PResult<Spanned<Statement>> {
-    spanned(|i| {
+    spanned::spanned(|i| {
         parse_expression.map(|expr| {
             Statement::Expr(expr)
         }).parse(i)
@@ -326,39 +297,26 @@ pub fn parse_expression(input: ParserSpan) -> PResult<Spanned<Expr>> {
 fn parse_expr_toplevel(input: ParserSpan) -> PResult<Spanned<Expr>> {
     alt((
         parse_list_expr,
+        parse_string_expr,
         parse_number_value.map(|sp_val| Spanned::new(sp_val.span.clone(), Expr::Value(sp_val))),
         parse_identifier_value.map(|sp_val| Spanned::new(sp_val.span.clone(), Expr::Value(sp_val))),
     ))
         .parse(input)
 }
 
+fn parse_string_expr(input: ParserSpan) -> PResult<Spanned<Expr>> {
+    spanned::spanned(|i| {
+        parse_string_value.map(|sp_val| {
+            Expr::Value(sp_val)
+        }).parse(i)
+    })
+        .parse(input)
+}
+
 /// Parse a list of expressions separated by whitespace or optional commas.
 /// A list: `[ item1 item2 item3 ]`. Each item is parsed with `parse_expr_no_call`
-// OLD IMPLEMENTATION
-// fn parse_list(input: Span) -> KResult<KExpr> {
-//     context(
-//         "list",
-//         delimited(
-//             char('['),
-//             preceded(
-//                 multispace0,
-//                 separated_list0(
-//                     alt((multispace1, delimited(multispace0, tag(","), multispace0))),
-//                     parse_expr_no_call,
-//                 ),
-//             ),
-//             preceded(
-//                 preceded(multispace0, opt((tag(","), multispace0))),
-//                 char(']'),
-//             ),
-//         ),
-//     )
-//         .map(KExpr::List)
-//         .parse(input)
-// }
-// NEW
 fn parse_list_expr(input: ParserSpan) -> PResult<Spanned<Expr>> {
-    spanned(|i| {
+    spanned::spanned(|i| {
         delimited(
             char('['),
             preceded(
@@ -416,7 +374,7 @@ fn parse_block_or_dict(input: ParserSpan) -> PResult<Spanned<Expr>> {
 
 /// A `{ ... }` block is a list of statements in braces.
 fn parse_block(input: ParserSpan) -> PResult<Spanned<Expr>> {
-    spanned(
+    spanned::spanned(
         |i| {
             parse_block_value
                 .map(|block| {
@@ -427,7 +385,7 @@ fn parse_block(input: ParserSpan) -> PResult<Spanned<Expr>> {
 }
 
 fn parse_block_value(input: ParserSpan) -> PResult<Spanned<Value>> {
-    spanned(|i| {
+    spanned::spanned(|i| {
         delimited(
             char('{'),
             delimited(multispace0, parse_statements, multispace0),
@@ -444,7 +402,7 @@ fn parse_block_value(input: ParserSpan) -> PResult<Spanned<Value>> {
 // No leading space is consumed; spacing is managed externally.
 // --------------------------------------------
 fn parse_binary_operator(input: ParserSpan) -> IResult<ParserSpan, Spanned<Operator>, ParseError> {
-    spanned(|i| {
+    spanned::spanned(|i| {
         alt((
             map(parse_tag("+"), |_| Operator::Add),
             map(parse_tag("-"), |_| Operator::Subtract),
@@ -465,7 +423,7 @@ fn parse_binary_operator(input: ParserSpan) -> IResult<ParserSpan, Spanned<Opera
 // They return Spanned<Value> which we later wrap into an Expr.
 // --------------------------------------------
 fn parse_number_value(input: ParserSpan) -> IResult<ParserSpan, Spanned<Value>, ParseError> {
-    spanned(|i| {
+    spanned::spanned(|i| {
         let (i, digits) = parse_digit1(i)?;
         let s = digits.fragment();
         let val_i64 = s.parse::<i64>().map_err(|e| {
@@ -501,7 +459,7 @@ fn parse_identifier(input: ParserSpan) -> IResult<ParserSpan, String, ParseError
 }
 
 fn parse_identifier_value(input: ParserSpan) -> IResult<ParserSpan, Spanned<Value>, ParseError> {
-    spanned(|i| {
+    spanned::spanned(|i| {
         parse_identifier.map(
             |s: String| {
                 Value::Word(s)
