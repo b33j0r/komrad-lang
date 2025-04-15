@@ -1,5 +1,5 @@
-use crate::Channel;
 use crate::codemap::ParserSpan;
+use crate::Channel;
 use indexmap::IndexMap;
 use nom::error::{FromExternalError, ParseError as NomParseError};
 use std::ops::{Deref, DerefMut};
@@ -7,7 +7,7 @@ use std::sync::Arc;
 use thiserror::Error;
 
 pub enum TopLevel {
-    Statement(Statement),
+    Statement(Spanned<Statement>),
     Block(Block),
 }
 

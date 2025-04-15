@@ -31,6 +31,7 @@ use tui_logger::{
 use tui_textarea::TextArea;
 
 use komrad_core::ToSExpr;
+use komrad_interpreter::Interpreter;
 use komrad_parser::parse_toplevel::parse_snippet_complete;
 
 /// An enum for our internal events.
@@ -58,16 +59,21 @@ fn spawn_blocking_event_reader(tx: mpsc::Sender<CrosstermEvent>, shutdown: Cance
 }
 
 /// Interpreter hook.
-async fn interpret_input(input: &str) -> Result<String, Box<dyn Error>> {
+async fn interpret_input(input: &str, interpreter: &mut Interpreter) -> Result<String, Box<dyn Error>> {
     let mut codemaps = komrad_core::CodeAtlas::new();
     let top_level = parse_snippet_complete(&mut codemaps, input)
         .map_err(|e| format!("Parse error: {:?}", e))?;
     let sexpr = top_level.to_sexpr();
     debug!("SEXPR:  {}", sexpr.to_plain_string());
 
-    // Simulate a computation delay.
-    time::sleep(Duration::from_millis(0)).await;
-    Ok("Interpretation result".to_string())
+    let result = interpreter.run_top_level(top_level).await;
+    match result {
+        Ok(value) => {
+            let result_str = value.to_sexpr().to_plain_string();
+            Ok(result_str)
+        }
+        Err(e) => Err(format!("Runtime error: {:?}", e).into()),
+    }
 }
 
 /// A custom log formatter for the TUI logger that uses colors based on log levels.
@@ -100,6 +106,8 @@ impl LogFormatter for MyLogFormatter {
 // -- snip previous imports --
 
 pub async fn main() -> Result<(), Box<dyn Error>> {
+    let mut interpreter = Interpreter::new();
+
     tui_logger::init_logger(LevelFilter::Trace)?;
     tracing::subscriber::set_global_default(Registry::default().with(TuiTracingSubscriberLayer))?;
 
@@ -212,7 +220,7 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
                                 history_index = None;
                                 input_area = TextArea::default();
 
-                                match interpret_input(&user_input).await {
+                                match interpret_input(&user_input, &mut interpreter).await {
                                     Ok(result) => warn!("OUTPUT: {}", result),
                                     Err(e) => error!("ERROR:  {}", e),
                                 }

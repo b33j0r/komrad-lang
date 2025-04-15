@@ -1,28 +1,50 @@
-use komrad_core::{Block, CodeAtlas, Env, RuntimeError, Value};
-use std::path::PathBuf;
+#![feature(box_patterns)]
+
+use komrad_core::{CodeAtlas, Env, Evaluate, EvaluationContext, RuntimeError, Spanned, Statement, TopLevel, Value};
+use std::collections::HashMap;
 
 pub type InterpreterResult<T> = Result<T, RuntimeError>;
 
 pub struct Interpreter {
     codemaps: CodeAtlas,
-    env: Env,
+    evaluation_context: EvaluationContext,
 }
 
 impl Interpreter {
     pub fn new() -> Self {
         Self {
             codemaps: CodeAtlas::new(),
+            evaluation_context: EvaluationContext {
+                env: Env::new(
+                    HashMap::new(),
+                    Vec::new(),
+                )
+            },
         }
     }
 
-    // The difference between most of the run modes is how we acquire the input
-    // span and add it to the codemaps.
+    pub async fn run_statement(&mut self, statement: Spanned<Statement>) -> InterpreterResult<Value> {
+        let result = statement.evaluate(&mut self.evaluation_context).await;
+        Ok(result)
+    }
 
-    pub fn run_block(&mut self, block: Block) -> InterpreterResult<Value> {}
-
-    pub fn run_statement(&mut self, statement: &str) -> InterpreterResult<Value> {}
-
-    pub fn run_string(&mut self, input: &str) -> InterpreterResult<Value> {}
-
-    pub fn run_file(&mut self, path: &PathBuf) -> InterpreterResult<Value> {}
+    pub async fn run_top_level(&mut self, top_level: TopLevel) -> InterpreterResult<Value> {
+        match top_level {
+            TopLevel::Block(block) => {
+                let mut result = Value::Null;
+                for statement in block.0 {
+                    match self.run_statement(statement).await {
+                        Ok(value) => result = value,
+                        Err(e) => {
+                            return Err(e);
+                        }
+                    }
+                }
+                Ok(result)
+            }
+            TopLevel::Statement(statement) => {
+                self.run_statement(statement).await
+            }
+        }
+    }
 }

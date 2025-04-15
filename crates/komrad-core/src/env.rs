@@ -107,8 +107,8 @@ impl Env {
     }
 
     /// Push a new handler onto this environment's handler list
-    pub async fn push_handler(&mut self, handler: Handler) {
-        self.handlers.push(Arc::new(handler));
+    pub async fn push_handler(&mut self, handler: Arc<Handler>) {
+        self.handlers.push(handler);
     }
 
     /// Get the current list of handlers
@@ -229,14 +229,14 @@ mod tests {
     async fn test_env_clone_handler_scope() {
         let mut env = Env::new(HashMap::new(), Vec::new());
         env.set("x", Value::Int(42)).await;
-        env.push_handler(Handler {
+        env.push_handler(Arc::new(Handler {
             pattern: Pattern::new_word("foo".to_string()),
             expr: Spanned::new(
                 crate::ast::Span::default(),
                 Expr::Value(Spanned::new(crate::ast::Span::default(), Value::Int(100))),
             ),
-        })
-        .await;
+        }))
+            .await;
 
         // Clone a child environment
         let mut child_env = env.clone_handler_scope().await;
