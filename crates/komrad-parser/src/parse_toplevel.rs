@@ -162,6 +162,9 @@ fn parse_call_arg(input: ParserSpan) -> PResult<Spanned<Expr>> {
             parse_number_value.map(|sp_val| {
                 Expr::Value(sp_val)
             }),
+            parse_string_value.map(|sp_val| {
+                Expr::Value(sp_val)
+            }),
             parse_identifier_value.map(|sp_val| {
                 Expr::Value(sp_val)
             }),

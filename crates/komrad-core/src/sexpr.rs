@@ -25,7 +25,7 @@ impl PartialEq for SExpr {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (SExpr::Nil, SExpr::Nil) => true,
-            (SExpr::Atom(a), SExpr::Atom(b)) => a == b,
+            (SExpr::Atom(a), SExpr::Atom(b)) => { a == b }
             (SExpr::String(a), SExpr::String(b)) => a == b,
             (SExpr::List(a), SExpr::List(b)) => {
                 if a.len() != b.len() {
@@ -73,7 +73,7 @@ impl SExpr {
     pub fn to_plain_string(&self) -> String {
         match self {
             SExpr::Nil => "nil".to_string(),
-            SExpr::Atom(a) => a.clone(),
+            SExpr::Atom(a) => format!("{}", a.clone()),
             SExpr::String(s) => format!("\"{}\"", s),
             SExpr::List(items) => {
                 let mut out = String::from("(");
@@ -447,7 +447,7 @@ impl ToSExpr for Vec<Spanned<Statement>> {
 use nom::branch::alt;
 use nom::bytes::complete::{escaped_transform, is_not, take_while1};
 use nom::character::complete::{char, multispace0, multispace1};
-use nom::combinator::{all_consuming, map, value};
+use nom::combinator::{all_consuming, map, opt, value};
 use nom::multi::separated_list0;
 use nom::sequence::delimited;
 use nom::{IResult, Parser};
@@ -507,7 +507,9 @@ fn parse_string(input: SParserSpan) -> SResult<SExpr> {
             value("\t", char('t')),
         )),
     );
-    let (input, content) = delimited(char('"'), esc, char('"')).parse(input)?;
+    let (input, content) = delimited(char('"'), opt(esc), char('"'))
+        .map(|opt| opt.unwrap_or_else(|| "".to_string()))
+        .parse(input)?;
     Ok((input, SExpr::String(content)))
 }
 

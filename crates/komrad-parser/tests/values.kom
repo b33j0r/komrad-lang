@@ -9,3 +9,10 @@ foo
 
 ----
 (Block foo)
+
+
+==== value string
+"foo"
+
+----
+(Block "foo")

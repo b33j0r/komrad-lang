@@ -1,0 +1,26 @@
+==== string statement
+"Hello, world!"
+
+----
+(Block "Hello, world!")
+
+==== string with escape
+"Hello, \"world\"!"
+
+----
+(Block "Hello, \"world\"!")
+
+==== string assigned to variable
+
+a = 'Hello, world!'
+
+----
+
+(Block (Assign (Variable a) "Hello, world!"))
+
+
+==== empty string
+a = ""
+
+----
+(Block (Assign (Variable a) ""))

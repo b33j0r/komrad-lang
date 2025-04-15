@@ -10,10 +10,10 @@ use nom::Parser;
 /// Parses a single, double, or triple quoted string.
 pub fn parse_string(input: ParserSpan) -> PResult<String> {
     alt((
+        parse_empty_string,
         parse_triple_quoted_string,
         parse_double_quoted_string,
         parse_single_quoted_string,
-        parse_empty_string,
     ))
         .parse(input)
 }
