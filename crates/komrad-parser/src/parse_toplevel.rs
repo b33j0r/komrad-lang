@@ -353,9 +353,20 @@ pub fn parse_expression(input: ParserSpan) -> PResult<Spanned<Expr>> {
         .parse(input)
 }
 
+fn parse_parenthesized_expr(input: ParserSpan) -> PResult<Spanned<Expr>> {
+    delimited(
+        char('('),
+        preceded(multispace0, parse_expression),
+        preceded(multispace0, char(')')),
+    )
+        .parse(input)
+}
+
+
 /// A toplevel expression (number or identifier) is wrapped into Expr::Value.
 fn parse_expr_toplevel(input: ParserSpan) -> PResult<Spanned<Expr>> {
     alt((
+        parse_parenthesized_expr,
         parse_list_expr,
         parse_block_or_dict,
         parse_string_expr,
