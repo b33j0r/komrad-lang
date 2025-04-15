@@ -3,11 +3,12 @@
 use crate::parse_strings::parse_string_value;
 use crate::result::PResult;
 use crate::spanned;
-use komrad_core::ParseError;
+use komrad_core::Handler;
 use komrad_core::Value;
 use komrad_core::{AssignmentTarget, Block, CodeAtlas, ParserSpan, TopLevel};
 use komrad_core::{Expr, Statement};
 use komrad_core::{Operator, Span, Spanned};
+use komrad_core::{ParseError, Pattern};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::character::complete::{
@@ -112,12 +113,83 @@ fn parse_statement(input: ParserSpan) -> PResult<Spanned<Statement>> {
         space0,
         alt((
             parse_assignment_statement,
+            parse_handler_statement,
             parse_tell_statement,
             parse_expr_statement,
             parse_blank_line,
             parse_comment_line,
         )),
     )
+        .parse(input)
+}
+
+fn parse_handler_statement(input: ParserSpan) -> PResult<Spanned<Statement>> {
+    // like `[x _y _{branch} _(x>3)] { ...block... }`
+    spanned::spanned(|i| {
+        pair(
+            delimited(
+                preceded(space0, char('[')),
+                preceded(multispace0, parse_pattern),
+                preceded(multispace0, char(']')),
+            ),
+            preceded(space0, parse_block),
+        )
+            .map(|(pattern, expr)| {
+                Statement::Handler(Arc::new(Handler {
+                    pattern,
+                    expr,
+                }))
+            })
+            .parse(i)
+    })
+        .parse(input)
+}
+
+fn parse_pattern(input: ParserSpan) -> PResult<Spanned<Pattern>> {
+    spanned::spanned(|i| {
+        preceded(
+            multispace0,
+            separated_list0(multispace1, parse_pattern_element),
+        )
+            .map(|elements| Pattern::List(elements))
+            .parse(i)
+    })
+        .parse(input)
+}
+
+fn parse_pattern_element(input: ParserSpan) -> PResult<Spanned<Pattern>> {
+    spanned::spanned(|i| {
+        alt((
+            parse_variable_capture.map(|sp_val| Pattern::VariableCapture(sp_val)),
+            parse_block_capture.map(|sp_val| Pattern::BlockCapture(sp_val)),
+            parse_identifier_value.map(|sp_val| Pattern::ValueMatch(sp_val)),
+            parse_number_value.map(|sp_val| Pattern::ValueMatch(sp_val)),
+            parse_string_value.map(|sp_val| Pattern::ValueMatch(sp_val)),
+        ))
+            .parse(i)
+    })
+        .parse(input)
+}
+
+fn parse_variable_capture(input: ParserSpan) -> PResult<Spanned<String>> {
+    spanned::spanned(|i| {
+        preceded(tag("_"), parse_identifier)
+            .map(|sp_val| sp_val)
+            .parse(i)
+    })
+        .parse(input)
+}
+
+fn parse_block_capture(input: ParserSpan) -> PResult<Spanned<String>> {
+    spanned::spanned(|i| {
+        delimited(
+            preceded(tag("_{"), space0),
+            parse_identifier,
+            preceded(space0, char('}')),
+        )
+            .map(|sp_val| sp_val)
+            .parse(i)
+    })
         .parse(input)
 }
 

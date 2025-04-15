@@ -206,9 +206,9 @@ pub enum Predicate {
 /// Pattern captures or matches on certain shapes of incoming values or messages.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Pattern {
-    ValueMatch(Value),
-    VariableCapture(String),
-    BlockCapture(String),
+    ValueMatch(Spanned<Value>),
+    VariableCapture(Spanned<String>),
+    BlockCapture(Spanned<String>),
     PredicateCapture(Spanned<Predicate>),
     List(Vec<Spanned<Pattern>>),
 }

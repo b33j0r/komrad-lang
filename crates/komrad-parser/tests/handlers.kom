@@ -1,0 +1,8 @@
+==== handler with statements
+[parse a handler] {
+	a = 1
+	b = 2
+}
+
+----
+(Block (Handler (HandlerStruct (PatternList (ValueMatch parse) (ValueMatch a) (ValueMatch handler)) (Block (Assign (Variable a) 1) (Assign (Variable b) 2)))))

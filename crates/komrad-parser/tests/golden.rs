@@ -1,4 +1,5 @@
 use glob;
+use komrad_core::ParseError;
 use komrad_core::{parse_sexpr, CodeAtlas, SParseError, ToSExpr};
 use komrad_parser::parse_toplevel::parse_snippet_complete;
 use miette::NamedSource;
@@ -13,6 +14,7 @@ use nom::{
 use nom_locate::LocatedSpan;
 use owo_colors::OwoColorize;
 use std::path::Path;
+use std::path::PathBuf;
 use std::sync::Arc;
 use thiserror::Error;
 use tracing::info;
@@ -239,9 +241,6 @@ fn parse_test_case(input: SuiteSpan) -> SuiteResult<TestCase> {
     };
     Ok((input, test_case))
 }
-
-use komrad_core::error::ParseError;
-use std::path::PathBuf;
 
 #[test]
 fn golden_tests() -> Result<(), Box<dyn std::error::Error>> {

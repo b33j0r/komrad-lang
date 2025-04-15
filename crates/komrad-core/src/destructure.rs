@@ -46,7 +46,7 @@ impl Destructure for PatternDestructure {
         match (target, input) {
             // Exact match on literals
             (Pattern::ValueMatch(expected), actual) => {
-                if expected == actual {
+                if &**expected == actual {
                     DestructureResult::Match(bindings)
                 } else {
                     DestructureResult::NoMatch
@@ -55,13 +55,13 @@ impl Destructure for PatternDestructure {
 
             // Capture a variable
             (Pattern::VariableCapture(name), value) => {
-                bindings.insert(name.clone(), value.clone());
+                bindings.insert(*name.value.clone(), value.clone());
                 DestructureResult::Match(bindings)
             }
 
             // Capture a block if it's actually a block
             (Pattern::BlockCapture(name), value @ Value::Block(_)) => {
-                bindings.insert(name.clone(), value.clone());
+                bindings.insert(*name.value.clone(), value.clone());
                 DestructureResult::Match(bindings)
             }
             (Pattern::BlockCapture(_), _) => DestructureResult::NoMatch,
