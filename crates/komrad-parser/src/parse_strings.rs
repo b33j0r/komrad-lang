@@ -20,7 +20,7 @@ pub fn parse_string(input: ParserSpan) -> PResult<String> {
 
 pub fn parse_empty_string(input: ParserSpan) -> PResult<String> {
     alt((tag("''"), tag("\"\"\"\"\"\""), tag("\"\"")))
-        .map(|s: ParserSpan| "".to_string())
+        .map(|_s: ParserSpan| "".to_string())
         .parse(input)
 }
 

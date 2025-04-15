@@ -33,6 +33,7 @@ impl Evaluate for Expr {
 
     async fn evaluate(&self, context: &mut EvaluationContext) -> Value {
         match self {
+            // Bind a word (variable) to a value
             Expr::Value(Spanned {
                             value: box Value::Word(name),
                             span,
@@ -40,7 +41,11 @@ impl Evaluate for Expr {
                 RuntimeError::ArgumentError(format!("Undefined variable: {}", name))
                     .as_spanned(span.clone()),
             ),
+
+            // Value is just propagated
             Expr::Value(Spanned { box value, .. }) => value.clone(),
+
+            // Evaluate each element in the list
             Expr::List { elements } => {
                 let mut evaluated_elements = Vec::with_capacity(elements.len());
                 for elem in elements {
@@ -49,6 +54,8 @@ impl Evaluate for Expr {
                 }
                 Value::List(evaluated_elements)
             }
+
+            // Evaluate each value in the dictionary
             Expr::Dict { index_map } => {
                 let mut evaluated_map = IndexMap::new();
                 for (key, value) in index_map {
@@ -58,6 +65,8 @@ impl Evaluate for Expr {
                 }
                 Value::Dict(evaluated_map)
             }
+
+            // Evaluate the binary expression recursively
             Expr::BinaryExpr { lhs, op, rhs } => {
                 let left_val = lhs.value.evaluate(context).await;
                 let right_val = rhs.value.evaluate(context).await;
@@ -102,13 +111,16 @@ impl Evaluate for Expr {
                     ),
                 }
             }
+
+            // TODO: send the ask with channel.send_and_recv
             Expr::Ask { target, value } => {
                 let target_val = target.value.evaluate(context).await;
                 let value_val = value.value.evaluate(context).await;
                 Value::List(vec![target_val, value_val])
             }
+
+            // return the item at the index for lists. return OutOfBounds if index is out of range
             Expr::SliceExpr { target, index } => {
-                // return the item at the index for lists. return OutOfBounds if index is out of range
                 let target_val = target.value.evaluate(context).await;
                 let index_val = index.value.evaluate(context).await;
 

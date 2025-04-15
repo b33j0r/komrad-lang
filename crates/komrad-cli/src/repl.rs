@@ -8,20 +8,20 @@ use ratatui::crossterm::event::{
 };
 use ratatui::crossterm::{
     execute,
-    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use ratatui::prelude::{Line, Text};
+use ratatui::prelude::Line;
 use ratatui::{
-    Terminal,
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
     style::{Color, Style},
-    widgets::{Block, Borders, Paragraph},
+    widgets::{Block, Borders},
+    Terminal,
 };
 use std::{
     error::Error,
     io, thread,
-    time::{Duration, Instant},
+    time::Duration,
 };
 use tokio::{select, sync::mpsc, time};
 use tokio_util::sync::CancellationToken;
@@ -97,12 +97,6 @@ impl LogFormatter for MyLogFormatter {
                 Line::from(span)
             })
             .collect()
-        //
-        // let span = ratatui::prelude::Span::styled(
-        //     evt.msg().to_string(),
-        //     Style::default().fg(color),
-        // );
-        // vec![Line::from(span)]
     }
 }
 

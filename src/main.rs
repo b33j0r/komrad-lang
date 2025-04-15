@@ -1,4 +1,7 @@
 #[tokio::main]
 async fn main() {
-    komrad_cli::repl::main().await;
+    match komrad_cli::repl::main().await {
+        Ok(_) => println!("REPL exited successfully."),
+        Err(e) => eprintln!("Error: {}", e),
+    }
 }
