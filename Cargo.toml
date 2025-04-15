@@ -29,3 +29,4 @@ tokio-util = { version = "0.7.11", features = ["full"] }
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter", "local-time"] }
 uuid = { version = "1.16.0", features = ["v7", "serde", "fast-rng"] }
+futures = { version = "0.3.31", features = ["alloc"] }

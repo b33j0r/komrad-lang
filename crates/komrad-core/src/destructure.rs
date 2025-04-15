@@ -1,13 +1,14 @@
 use crate::ast::Pattern;
 use crate::error::RuntimeError;
 use crate::value::Value;
-use crate::{Expr, Operator, Predicate, Spanned};
+use crate::{Expr, Operator, Predicate, Spanned, Type};
 use std::collections::HashMap;
 
 /// Match result type for destructuring:
 /// - `Match(O)` means successful destructuring
 /// - `NoMatch` is a soft failure (e.g. for handler filters)
 /// - `Err(E)` is a hard error (e.g. invalid predicate logic)
+#[derive(Debug, Clone, PartialEq)]
 pub enum DestructureResult<O, E> {
     Match(O),
     NoMatch,
@@ -324,6 +325,93 @@ fn eval_index(expr: &Spanned<Expr>) -> Result<Value, RuntimeError> {
         _ => Err(RuntimeError::TypeError(
             "Unsupported index expression in assignment target".to_string(),
         )),
+    }
+}
+
+// Agents can use this to destructure their input values. You make a
+// CommandSignature for each command, and then use the CommandDestructure
+// struct to destructure the input value into the command name and
+// arguments. This is used by the built-in agents to implement command
+// handlers.
+pub struct CommandDestructure;
+
+pub struct CommandSignature {
+    pub name: String,
+    pub args: Vec<Type>,
+}
+
+pub struct Command {
+    pub name: String,
+    pub args: Vec<Value>,
+}
+
+impl Destructure for CommandDestructure {
+    type Target = CommandSignature;
+    type Output = Command;
+    type Input = Value;
+    type Error = RuntimeError;
+
+    fn destructure(
+        target: &Self::Target,
+        input: &Self::Input,
+    ) -> DestructureResult<Self::Output, Self::Error> {
+        if let Value::List(vals) = input {
+            if vals.len() < 1 {
+                return DestructureResult::NoMatch;
+            }
+            let cmd_name = match &vals[0] {
+                Value::String(s) => s.clone(),
+                _ => return DestructureResult::NoMatch,
+            };
+            if cmd_name != target.name {
+                return DestructureResult::NoMatch;
+            }
+            let args = vals[1..]
+                .iter()
+                .zip(&target.args)
+                .map(|(val, ty)| match val {
+                    Value::Int(_) if *ty == Type::Int => Ok(val.clone()),
+                    Value::Float(_) if *ty == Type::Float => Ok(val.clone()),
+                    Value::String(_) if *ty == Type::String => Ok(val.clone()),
+                    _ => Err(RuntimeError::TypeError(format!(
+                        "Expected argument of type {:?}, got {:?}",
+                        ty, val
+                    ))),
+                })
+                .collect::<Result<Vec<_>, _>>();
+            match args {
+                Ok(args) => DestructureResult::Match(
+                    Command {
+                        name: target.name.clone(),
+                        args,
+                    },
+                ),
+                Err(e) => DestructureResult::Err(e),
+            }
+        } else {
+            DestructureResult::NoMatch
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests_command {
+    use super::*;
+    use crate::value::Value;
+
+    #[test]
+    fn test_command_destructure() {
+        let signature = CommandSignature {
+            name: "test".to_string(),
+            args: vec![Type::Int, Type::String],
+        };
+        let input = Value::List(vec![
+            Value::String("test".to_string()),
+            Value::Int(42),
+            Value::String("hello".to_string()),
+        ]);
+        let result = CommandDestructure::destructure(&signature, &input);
+        assert_eq!(result, Ok((signature.name, vec![Value::Int(42), Value::String("hello".to_string())])));
     }
 }
 

@@ -1,4 +1,7 @@
-use komrad_core::RuntimeError;
+use crate::fs_agent::FsAgent;
+use crate::io_agent::IoAgent;
+use crate::spawn_agent::SpawnAgent;
+use komrad_core::{Agent, AgentFactory, RuntimeError};
 use komrad_core::{CodeAtlas, Env, Evaluate, EvaluationContext, Spanned, Statement, TopLevel, Value};
 use komrad_parser::parse_toplevel::parse_file_complete;
 use std::collections::HashMap;
@@ -25,12 +28,30 @@ pub struct Interpreter {
 }
 
 impl Interpreter {
-    pub fn new() -> Self {
+    pub async fn new() -> Self {
+        let mut initial_bindings = HashMap::new();
+        let initial_handlers = Vec::new();
+
+        let io_agent = IoAgent::default();
+        let io_agent_channel = io_agent.spawn();
+        initial_bindings.insert("Io".to_string(), Value::Channel(io_agent_channel));
+
+        let fs_agent = FsAgent::default();
+        let fs_agent_channel = fs_agent.spawn();
+        initial_bindings.insert("Fs".to_string(), Value::Channel(fs_agent_channel));
+
+        let mut env = Env::new(initial_bindings.clone(), initial_handlers);
+
+        let mut factory_registry: HashMap<String, Box<dyn AgentFactory + Send + Sync>> = HashMap::new();
+
+        let spawn_agent = SpawnAgent::new(env.clone(), factory_registry);
+        let spawn_agent_channel = spawn_agent.spawn();
+
+        env.set("spawn", Value::Channel(spawn_agent_channel)).await;
+
         Self {
+            evaluation_context: EvaluationContext { env },
             codemaps: CodeAtlas::new(),
-            evaluation_context: EvaluationContext {
-                env: Env::new(HashMap::new(), Vec::new()),
-            },
         }
     }
 

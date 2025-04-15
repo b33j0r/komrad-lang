@@ -124,5 +124,7 @@ pub enum Type {
     String,
     Boolean,
     List,
+    Dict,
     Channel,
+    Block,
 }

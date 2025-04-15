@@ -63,7 +63,7 @@ impl Env {
         }
     }
 
-    pub fn clone_for_agent(&self) -> Self {
+    pub fn clone(&self) -> Self {
         Env {
             scope_stack: self.scope_stack.clone(), // Arc-ed stack
             handlers: self.handlers.clone(),       // Arc-ed handlers

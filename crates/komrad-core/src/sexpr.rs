@@ -446,7 +446,9 @@ impl ToSExpr for Type {
             Type::String => "String",
             Type::Boolean => "Boolean",
             Type::List => "List",
+            Type::Dict => "Dict",
             Type::Channel => "Channel",
+            Type::Block => "Block",
         };
         SExpr::Atom(type_str.to_string())
     }

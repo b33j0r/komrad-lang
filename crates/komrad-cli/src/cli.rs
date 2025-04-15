@@ -38,7 +38,7 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let command = args.command.unwrap_or_default();
 
     // Initialize your interpreter.
-    let mut interpreter = komrad_interpreter::Interpreter::new();
+    let mut interpreter = komrad_interpreter::Interpreter::new().await;
 
     // Match on the command.
     match command {

@@ -1,5 +1,6 @@
 use crate::error::RuntimeError;
 use crate::value::Value;
+use std::fmt::Debug;
 use std::sync::Arc;
 use tokio::sync::{mpsc, Mutex};
 
@@ -59,11 +60,17 @@ pub enum ControlMessage {
     Stop,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Channel {
     uuid: uuid::Uuid,
     sender_msg: mpsc::Sender<Message>,
     sender_ctl: mpsc::Sender<ControlMessage>,
+}
+
+impl Debug for Channel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.uuid)
+    }
 }
 
 impl PartialEq for Channel {

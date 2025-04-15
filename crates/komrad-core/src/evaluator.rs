@@ -1,15 +1,15 @@
 use crate::ast::{AssignmentTarget, Expr, Operator, Spanned, Statement};
+// Reuse the destructuring module for assignments.
+use crate::destructure::{AssignmentAction, AssignmentDestructure, Destructure, DestructureResult};
 use crate::env::Env;
+use crate::error::RuntimeError;
+use crate::value::Value;
 use crate::AsSpanned;
 use async_trait::async_trait;
 use indexmap::IndexMap;
 use std::future::Future;
 use std::pin::Pin;
-
-// Reuse the destructuring module for assignments.
-use crate::destructure::{AssignmentAction, AssignmentDestructure, Destructure, DestructureResult};
-use crate::error::RuntimeError;
-use crate::value::Value;
+use tracing::error;
 
 #[allow(dead_code)]
 pub struct EvaluationContext {
@@ -190,6 +190,7 @@ impl Evaluate for Spanned<Statement> {
             ),
             Statement::Handler(handler) => {
                 context.env.push_handler(handler.clone()).await;
+                error!("Handler pushed: {:?}", handler);
                 Value::Null
             }
             // For assignment, we now call our shared destructuring function.
