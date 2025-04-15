@@ -5,6 +5,7 @@ use crate::env::Env;
 use crate::AsSpanned;
 use async_trait::async_trait;
 use indexmap::IndexMap;
+use std::pin::Pin;
 
 #[allow(dead_code)]
 pub struct EvaluationContext {
@@ -190,20 +191,13 @@ impl Evaluate for Spanned<Statement> {
                 Value::Null
             }
 
-            // Assignment (currently only simple variable assignment)
+            // Assignment
             Statement::Assign { target, value } => {
-                let val = value.evaluate(context).await;
-                // target.value is a Box<AssignmentTarget>, so do .as_ref()
-                match target.value.as_ref() {
-                    AssignmentTarget::Variable(name) => {
-                        context.env.set(name, val).await;
-                        Value::Null
-                    }
-                    _ => Value::Error(
-                        RuntimeError::ArgumentError("Unimplemented assignment target".to_string())
-                            .as_spanned(target.span.clone()),
-                    ),
-                }
+                evaluate_assignment(
+                    target,
+                    value,
+                    context,
+                ).await
             }
 
             // "Tell" => send a message but do not await a reply
@@ -242,6 +236,171 @@ impl Evaluate for Spanned<Statement> {
         }
     }
 }
+
+
+// ----------------------------------------------------------------------------
+// Evaluate assignment targets
+// ----------------------------------------------------------------------------
+fn evaluate_assignment<'a>(
+    target: &'a Spanned<AssignmentTarget>,
+    value_expr: &'a Spanned<Expr>,
+    context: &'a mut EvaluationContext,
+) -> Pin<Box<dyn Future<Output=Value> + Send + 'a>> {
+    Box::pin(async move {
+        let val = value_expr.evaluate(context).await;
+        match target.value.as_ref() {
+            AssignmentTarget::Variable(name) => {
+                // Simple variable assignment
+                context.env.set(name, val).await;
+                Value::Null
+            }
+
+            // A slice target, e.g. `x[5] = ...`
+            AssignmentTarget::Slice { target: slice_target, index } => {
+                // 1) Retrieve the container
+                let container_value = get_target_value(slice_target, context).await;
+                // 2) Evaluate the slice index
+                let idx_val = index.evaluate(context).await;
+
+                match (container_value, idx_val) {
+                    (Value::List(mut vs), Value::Int(i)) => {
+                        if i < 0 || i as usize >= vs.len() {
+                            return Value::Error(
+                                RuntimeError::ArgumentError("Index out of bounds in slice assign".into())
+                                    .as_spanned(index.span.clone()),
+                            );
+                        }
+                        // 3) Update the list
+                        vs[i as usize] = val;
+
+                        // 4) Store updated container back into the environment or parent
+                        let updated = Value::List(vs);
+                        set_target_value(slice_target, updated, context).await
+                    }
+                    _ => Value::Error(
+                        RuntimeError::ArgumentError("Type mismatch or invalid slice assignment".into())
+                            .as_spanned(target.span.clone()),
+                    ),
+                }
+            }
+
+            // List destructuring, e.g. `(x, y) = some_list`
+            // That means we match each subtarget to each element
+            AssignmentTarget::List { elements } => {
+                match val {
+                    Value::List(vs) => {
+                        if vs.len() != elements.len() {
+                            return Value::Error(
+                                RuntimeError::ArgumentError(format!(
+                                    "List destructuring mismatch: got {}, expected {}",
+                                    vs.len(),
+                                    elements.len()
+                                ))
+                                    .as_spanned(target.span.clone()),
+                            );
+                        }
+                        // For each sub-target, recursively assign from the corresponding item
+                        for (i, elem_target) in elements.iter().enumerate() {
+                            // Wrap vs[i] in a temporary Value::Expr spanned
+                            // so that we can feed it to evaluate_assignment
+                            let artificial_expr = Spanned::new(
+                                elem_target.span.clone(),
+                                Expr::Value(Spanned::new(
+                                    elem_target.span.clone(),
+                                    vs[i].clone(),
+                                )),
+                            );
+                            let result = evaluate_assignment(elem_target, &artificial_expr, context).await;
+                            if let Value::Error(_) = result {
+                                return result; // propagate the error
+                            }
+                        }
+                        Value::Null
+                    }
+                    _ => Value::Error(
+                        RuntimeError::ArgumentError("Right-hand side not a list for destructuring".into())
+                            .as_spanned(target.span.clone()),
+                    ),
+                }
+            }
+        }
+    })
+}
+
+/// Recursively retrieves the current value of an assignment target
+/// so we can mutate it. For `Variable`, we get from the env.
+/// For `Slice`, we recursively retrieve the container, then do the slice.
+fn get_target_value<'a>(
+    target: &'a Spanned<AssignmentTarget>,
+    context: &'a mut EvaluationContext,
+) -> Pin<Box<dyn Future<Output=Value> + Send + 'a>> {
+    Box::pin(async move {
+        match target.value.as_ref() {
+            AssignmentTarget::Variable(name) => {
+                context.env.get(name).await.unwrap_or(Value::Null)
+            }
+            AssignmentTarget::Slice { target: slice_target, index } => {
+                let container_val = get_target_value(slice_target, context).await;
+                let idx_val = index.evaluate(context).await;
+                match (container_val, idx_val) {
+                    (Value::List(vs), Value::Int(i)) => {
+                        if i >= 0 && (i as usize) < vs.len() {
+                            vs[i as usize].clone()
+                        } else {
+                            Value::Null
+                        }
+                    }
+                    _ => Value::Null,
+                }
+            }
+            AssignmentTarget::List { elements: _ } => {
+                // Handle list destructuring (if needed)
+                Value::Null
+            }
+        }
+    })
+}
+
+
+/// Recursively sets the updated container after a slice assignment
+fn set_target_value<'a>(
+    target: &'a Spanned<AssignmentTarget>,
+    new_val: Value,
+    context: &'a mut EvaluationContext,
+) -> Pin<Box<dyn Future<Output=Value> + Send + 'a>> {
+    Box::pin(async move {
+        match target.value.as_ref() {
+            AssignmentTarget::Variable(name) => {
+                // Store new_val in your environment
+                context.env.set(name, new_val.clone()).await;
+                new_val
+            }
+            AssignmentTarget::Slice { target: slice_target, index } => {
+                // 1. Retrieve container
+                let mut container_val = get_target_value(slice_target, context).await;
+                // 2. Evaluate index
+                let idx_val = index.evaluate(context).await;
+                // 3. If container is a List and idx_val is an Int, replace
+                //    the specified element and update the container in env
+                match (container_val, idx_val) {
+                    (Value::List(mut vs), Value::Int(i)) if i >= 0 && (i as usize) < vs.len() => {
+                        vs[i as usize] = new_val.clone();
+                        // Update container
+                        let updated = Value::List(vs);
+                        set_target_value(slice_target, updated, context).await
+                    }
+                    _ => Value::Null,
+                }
+            }
+            AssignmentTarget::List { elements: _ } => {
+                // If you allow setting directly to a list pattern, handle it here
+                // Or leave it as a no-op
+                Value::Null
+            }
+        }
+    })
+}
+
 
 // -------------------------------
 // Tests

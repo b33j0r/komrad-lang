@@ -169,6 +169,8 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
     let mut history_index: Option<usize> = None;
     let mut logger_state = TuiWidgetState::new();
 
+    debug!("Starting REPL...");
+
     loop {
         let log_formatter = Box::new(MyLogFormatter);
         terminal.draw(|f| {
