@@ -25,7 +25,7 @@ impl PartialEq for SExpr {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (SExpr::Nil, SExpr::Nil) => true,
-            (SExpr::Atom(a), SExpr::Atom(b)) => { a == b }
+            (SExpr::Atom(a), SExpr::Atom(b)) => a == b,
             (SExpr::String(a), SExpr::String(b)) => a == b,
             (SExpr::List(a), SExpr::List(b)) => {
                 if a.len() != b.len() {
@@ -233,10 +233,7 @@ impl ToSExpr for Expr {
             Dict { index_map } => {
                 let mut vec = vec![SExpr::Atom("Dict".to_string())];
                 for (key, value) in index_map {
-                    vec.push(SExpr::List(vec![
-                        key.to_sexpr(),
-                        value.to_sexpr(),
-                    ]));
+                    vec.push(SExpr::List(vec![key.to_sexpr(), value.to_sexpr()]));
                 }
                 SExpr::List(vec)
             }
@@ -288,9 +285,7 @@ impl ToSExpr for Value {
             Int(i) => SExpr::Atom(i.to_string()),
             Float(f) => SExpr::Atom(f.to_string()),
             Uuid(u) => SExpr::Atom(u.to_string()),
-            Block(arc_block) => {
-                arc_block.to_sexpr()
-            }
+            Block(arc_block) => arc_block.to_sexpr(),
         }
     }
 }
@@ -318,10 +313,7 @@ impl ToSExpr for Statement {
             BlankLine => SExpr::Atom("BlankLine".to_string()),
             Comment(s) => SExpr::List(vec![SExpr::Atom("Comment".to_string()), s.to_sexpr()]),
             Expr(e) => e.to_sexpr(),
-            Assign {
-                target,
-                value,
-            } => {
+            Assign { target, value } => {
                 let mut vec = vec![SExpr::Atom("Assign".to_string()), target.to_sexpr()];
                 vec.push(value.to_sexpr());
                 SExpr::List(vec)
@@ -367,9 +359,10 @@ impl ToSExpr for AssignmentTarget {
     fn to_sexpr(&self) -> SExpr {
         use AssignmentTarget::*;
         match self {
-            Variable(s) => SExpr::List(vec![SExpr::Atom("Variable".to_string()), SExpr::Atom(
-                s.to_string(),
-            )]),
+            Variable(s) => SExpr::List(vec![
+                SExpr::Atom("Variable".to_string()),
+                SExpr::Atom(s.to_string()),
+            ]),
             Slice { target, index } => SExpr::List(vec![
                 SExpr::Atom("Slice".to_string()),
                 target.to_sexpr(),
@@ -511,7 +504,7 @@ fn parse_list(input: SParserSpan) -> SResult<SExpr> {
         ),
         char(')'),
     )
-        .parse(input)
+    .parse(input)
 }
 
 /// Parse a double-quoted string. Basic escapes: \" \\ \n \r \t

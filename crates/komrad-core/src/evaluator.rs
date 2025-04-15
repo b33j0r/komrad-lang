@@ -1,6 +1,6 @@
+use crate::AsSpanned;
 use crate::ast::{Expr, Operator, RuntimeError, Spanned, Value};
 use crate::env::Env;
-use crate::AsSpanned;
 use async_trait::async_trait;
 use indexmap::IndexMap;
 
@@ -35,9 +35,9 @@ impl Evaluate for Expr {
         match self {
             // Bind a word (variable) to a value
             Expr::Value(Spanned {
-                            value: box Value::Word(name),
-                            span,
-                        }) => Value::Error(
+                value: box Value::Word(name),
+                span,
+            }) => Value::Error(
                 RuntimeError::ArgumentError(format!("Undefined variable: {}", name))
                     .as_spanned(span.clone()),
             ),
@@ -91,7 +91,7 @@ impl Evaluate for Expr {
                             RuntimeError::ArgumentError(
                                 "Type mismatch in multiplication".to_string(),
                             )
-                                .as_spanned(rhs.span.clone()),
+                            .as_spanned(rhs.span.clone()),
                         ),
                     },
                     box Operator::Divide => match (left_val, right_val) {
@@ -313,9 +313,9 @@ mod tests {
         let result = expr.evaluate(&mut context).await;
         match result {
             Value::Error(Spanned {
-                             value: box RuntimeError::ArgumentError(msg),
-                             ..
-                         }) => {
+                value: box RuntimeError::ArgumentError(msg),
+                ..
+            }) => {
                 assert_eq!(msg, "Divide by zero");
             }
             _ => panic!("Expected a division by zero error"),
@@ -455,10 +455,10 @@ mod tests {
         let result = expr.evaluate(&mut context).await;
         match result {
             Value::Error(Spanned {
-                             span,
-                             value: box RuntimeError::ArgumentError(msg),
-                             ..
-                         }) => {
+                span,
+                value: box RuntimeError::ArgumentError(msg),
+                ..
+            }) => {
                 assert_eq!(msg, "Index out of bounds");
                 assert_eq!(span.file_id, 1);
                 assert_eq!(span.start, 2);

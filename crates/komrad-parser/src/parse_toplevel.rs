@@ -8,7 +8,9 @@ use komrad_core::{Expr, ParseError, Statement};
 use komrad_core::{Operator, Span, Spanned, Value};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
-use nom::character::complete::{alpha1, char, line_ending, multispace0, multispace1, not_line_ending, space0};
+use nom::character::complete::{
+    alpha1, char, line_ending, multispace0, multispace1, not_line_ending, space0,
+};
 use nom::combinator::{map, opt};
 use nom::multi::{many0, many1, separated_list0, separated_list1};
 use nom::sequence::{delimited, pair, preceded};
@@ -94,13 +96,13 @@ fn parse_statements(input: ParserSpan) -> PResult<Vec<Spanned<Statement>>> {
         separated_list0(many1(preceded(opt(space0), line_ending)), parse_statement),
         multispace0,
     )
-        .map(|stmts| {
-            stmts
-                .into_iter()
-                .filter(|s| !matches!(*s.value, Statement::BlankLine))
-                .collect()
-        })
-        .parse(input)
+    .map(|stmts| {
+        stmts
+            .into_iter()
+            .filter(|s| !matches!(*s.value, Statement::BlankLine))
+            .collect()
+    })
+    .parse(input)
 }
 
 fn parse_statement(input: ParserSpan) -> PResult<Spanned<Statement>> {
@@ -111,66 +113,50 @@ fn parse_statement(input: ParserSpan) -> PResult<Spanned<Statement>> {
             parse_tell_statement,
             parse_expr_statement,
             parse_blank_line,
-            parse_comment_line
+            parse_comment_line,
         )),
     )
-        .parse(input)
+    .parse(input)
 }
 
 fn parse_tell_statement(input: ParserSpan) -> PResult<Spanned<Statement>> {
     // like `bob something 42 + 3 ok`
     spanned::spanned(|i| {
         pair(parse_call_target, preceded(space0, parse_call_args))
-            .map(|(target, args)| {
-                Statement::Tell {
-                    target,
-                    value: args,
-                }
+            .map(|(target, args)| Statement::Tell {
+                target,
+                value: args,
             })
             .parse(i)
-    }).parse(input)
+    })
+    .parse(input)
 }
 
 fn parse_call_target(input: ParserSpan) -> PResult<Spanned<Expr>> {
-    spanned::spanned(|i| {
-        alt((
-            parse_identifier_value.map(|sp_val| {
-                Expr::Value(sp_val)
-            }),
-        )).parse(i)
-    })
+    spanned::spanned(|i| alt((parse_identifier_value.map(|sp_val| Expr::Value(sp_val)),)).parse(i))
         .parse(input)
 }
 
 fn parse_call_args(input: ParserSpan) -> PResult<Spanned<Expr>> {
     // like `something 42 + 3 ok` as an Expr::List
     spanned::spanned(|i| {
-        separated_list1(space0, parse_call_arg).map(
-            |args| {
-                Expr::List {
-                    elements: args
-                }
-            }
-        ).parse(i)
+        separated_list1(space0, parse_call_arg)
+            .map(|args| Expr::List { elements: args })
+            .parse(i)
     })
-        .parse(input)
+    .parse(input)
 }
 
 fn parse_call_arg(input: ParserSpan) -> PResult<Spanned<Expr>> {
     spanned::spanned(|i| {
         alt((
-            parse_number_value.map(|sp_val| {
-                Expr::Value(sp_val)
-            }),
-            parse_string_value.map(|sp_val| {
-                Expr::Value(sp_val)
-            }),
-            parse_identifier_value.map(|sp_val| {
-                Expr::Value(sp_val)
-            }),
-        )).parse(i)
+            parse_number_value.map(|sp_val| Expr::Value(sp_val)),
+            parse_string_value.map(|sp_val| Expr::Value(sp_val)),
+            parse_identifier_value.map(|sp_val| Expr::Value(sp_val)),
+        ))
+        .parse(i)
     })
-        .parse(input)
+    .parse(input)
 }
 
 /// Assignment statement: parse an assignment and return it as a Statement.
@@ -178,17 +164,18 @@ fn parse_assignment_statement(input: ParserSpan) -> PResult<Spanned<Statement>> 
     spanned::spanned(|i| {
         pair(
             parse_assignment_target,
-            preceded(preceded(space0, parse_tag("=")), preceded(space0, parse_expression)),
-        ).map(
-            |(target, expr)| {
-                Statement::Assign {
-                    target,
-                    value: expr,
-                }
-            }
-        ).parse(i)
+            preceded(
+                preceded(space0, parse_tag("=")),
+                preceded(space0, parse_expression),
+            ),
+        )
+        .map(|(target, expr)| Statement::Assign {
+            target,
+            value: expr,
+        })
+        .parse(i)
     })
-        .parse(input)
+    .parse(input)
 }
 
 /// Assignment target: parse an identifier and return it as a Value::Word.
@@ -198,13 +185,12 @@ fn parse_assignment_target(input: ParserSpan) -> PResult<Spanned<AssignmentTarge
             // Try destructuring first.
             parse_destructure_target,
             // Fallback to variable assignment.
-            parse_identifier.map(|sp_val| AssignmentTarget::Variable(sp_val))
+            parse_identifier.map(|sp_val| AssignmentTarget::Variable(sp_val)),
         ))
-            .parse(i)
+        .parse(i)
     })
-        .parse(input)
+    .parse(input)
 }
-
 
 fn parse_destructure_target(input: ParserSpan) -> PResult<AssignmentTarget> {
     // Recognize a bracketed list of assignment targets.
@@ -214,8 +200,8 @@ fn parse_destructure_target(input: ParserSpan) -> PResult<AssignmentTarget> {
         separated_list1(multispace1, parse_assignment_target),
         char(']'),
     )
-        .map(|elements| AssignmentTarget::List { elements })
-        .parse(input)
+    .map(|elements| AssignmentTarget::List { elements })
+    .parse(input)
 }
 
 #[cfg(test)]
@@ -267,7 +253,7 @@ fn parse_comment_line(input: ParserSpan) -> PResult<Spanned<Statement>> {
         // Create the Comment statement.
         Ok((i, Statement::Comment(comment_text.fragment().to_string())))
     })
-        .parse(input)
+    .parse(input)
 }
 
 /// Blank line: simply consume the line and return a Statement::BlankLine.
@@ -276,24 +262,24 @@ fn parse_blank_line(input: ParserSpan) -> PResult<Spanned<Statement>> {
         let (i, _) = line_ending(i)?;
         Ok((i, Statement::BlankLine))
     })
-        .parse(input)
+    .parse(input)
 }
 
 /// Expression statement: simply parse an expression and wrap it as a Statement.
 fn parse_expr_statement(input: ParserSpan) -> PResult<Spanned<Statement>> {
-    spanned::spanned(|i| {
-        parse_expression.map(|expr| {
-            Statement::Expr(expr)
-        }).parse(i)
-    })
-        .parse(input)
+    spanned::spanned(|i| parse_expression.map(|expr| Statement::Expr(expr)).parse(i)).parse(input)
 }
 
 // --------------------------------------------
 // Expression parsers.
 // --------------------------------------------
 pub fn parse_expression(input: ParserSpan) -> PResult<Spanned<Expr>> {
-    alt((parse_block_or_dict, parse_binary_expression, parse_expr_toplevel)).parse(input)
+    alt((
+        parse_block_or_dict,
+        parse_binary_expression,
+        parse_expr_toplevel,
+    ))
+    .parse(input)
 }
 
 /// A toplevel expression (number or identifier) is wrapped into Expr::Value.
@@ -304,16 +290,16 @@ fn parse_expr_toplevel(input: ParserSpan) -> PResult<Spanned<Expr>> {
         parse_number_value.map(|sp_val| Spanned::new(sp_val.span.clone(), Expr::Value(sp_val))),
         parse_identifier_value.map(|sp_val| Spanned::new(sp_val.span.clone(), Expr::Value(sp_val))),
     ))
-        .parse(input)
+    .parse(input)
 }
 
 fn parse_string_expr(input: ParserSpan) -> PResult<Spanned<Expr>> {
     spanned::spanned(|i| {
-        parse_string_value.map(|sp_val| {
-            Expr::Value(sp_val)
-        }).parse(i)
+        parse_string_value
+            .map(|sp_val| Expr::Value(sp_val))
+            .parse(i)
     })
-        .parse(input)
+    .parse(input)
 }
 
 /// Parse a list of expressions separated by whitespace or optional commas.
@@ -334,10 +320,10 @@ fn parse_list_expr(input: ParserSpan) -> PResult<Spanned<Expr>> {
                 char(']'),
             ),
         )
-            .map(|elements| Expr::List { elements })
-            .parse(i)
+        .map(|elements| Expr::List { elements })
+        .parse(i)
     })
-        .parse(input)
+    .parse(input)
 }
 
 /// Minimal binary expression: `expr operator expr`.
@@ -372,22 +358,12 @@ fn parse_binary_expression(input: ParserSpan) -> PResult<Spanned<Expr>> {
 
 /// Distinguish a `{ block }` vs. `{ dict }` by checking for colon usage, etc.
 fn parse_block_or_dict(input: ParserSpan) -> PResult<Spanned<Expr>> {
-    alt((
-        parse_dict_expr,
-        parse_block,
-    )).parse(input)
+    alt((parse_dict_expr, parse_block)).parse(input)
 }
 
 /// A `{ ... }` block is a list of statements in braces.
 fn parse_block(input: ParserSpan) -> PResult<Spanned<Expr>> {
-    spanned::spanned(
-        |i| {
-            parse_block_value
-                .map(|block| {
-                    Expr::Value(block)
-                }).parse(i)
-        }
-    ).parse(input)
+    spanned::spanned(|i| parse_block_value.map(|block| Expr::Value(block)).parse(i)).parse(input)
 }
 
 fn parse_block_value(input: ParserSpan) -> PResult<Spanned<Value>> {
@@ -397,10 +373,10 @@ fn parse_block_value(input: ParserSpan) -> PResult<Spanned<Value>> {
             delimited(multispace0, parse_statements, multispace0),
             char('}'),
         )
-            .map(|block| Value::Block(Arc::new(Block(block))))
-            .parse(i)
+        .map(|block| Value::Block(Arc::new(Block(block))))
+        .parse(i)
     })
-        .parse(input)
+    .parse(input)
 }
 
 fn parse_dict_expr(input: ParserSpan) -> PResult<Spanned<Expr>> {
@@ -411,20 +387,22 @@ fn parse_dict_expr(input: ParserSpan) -> PResult<Spanned<Expr>> {
                 delimited(multispace0, char(','), multispace0),
                 parse_dict_entry,
             ),
-            preceded(opt(delimited(multispace0, char(','), multispace0)), preceded(multispace0, char('}'))),
+            preceded(
+                opt(delimited(multispace0, char(','), multispace0)),
+                preceded(multispace0, char('}')),
+            ),
         )
-            .map(|entries| {
-                let mut index_map = indexmap::IndexMap::new();
-                for (entry, value) in entries {
-                    index_map.insert(entry, value);
-                }
-                Expr::Dict { index_map }
-            })
-            .parse(i)
+        .map(|entries| {
+            let mut index_map = indexmap::IndexMap::new();
+            for (entry, value) in entries {
+                index_map.insert(entry, value);
+            }
+            Expr::Dict { index_map }
+        })
+        .parse(i)
     })
-        .parse(input)
+    .parse(input)
 }
-
 
 fn parse_dict_entry(input: ParserSpan) -> PResult<(String, Spanned<Expr>)> {
     pair(
@@ -434,7 +412,7 @@ fn parse_dict_entry(input: ParserSpan) -> PResult<(String, Spanned<Expr>)> {
             preceded(multispace0, parse_expression),
         ),
     )
-        .parse(input)
+    .parse(input)
 }
 
 // --------------------------------------------
@@ -453,9 +431,9 @@ fn parse_binary_operator(input: ParserSpan) -> IResult<ParserSpan, Spanned<Opera
             map(parse_tag(">"), |_| Operator::GreaterThan),
             map(parse_tag("<"), |_| Operator::LessThan),
         ))
-            .parse(i)
+        .parse(i)
     })
-        .parse(input)
+    .parse(input)
 }
 
 // --------------------------------------------
@@ -475,38 +453,24 @@ fn parse_number_value(input: ParserSpan) -> IResult<ParserSpan, Spanned<Value>, 
         })?;
         Ok((i, Value::Int(val_i64)))
     })
-        .parse(input)
+    .parse(input)
 }
 
 fn parse_identifier(input: ParserSpan) -> IResult<ParserSpan, String, ParseError> {
     // an alpha or underscore followed by alphanum or underscore or hyphen
-    (
-        alpha1,
-        many0(alt((
-            alpha1,
-            parse_tag("_"),
-            parse_tag("-"),
-        ))),
-    ).map(
-        |(first, rest): (ParserSpan, Vec<ParserSpan>)| {
+    (alpha1, many0(alt((alpha1, parse_tag("_"), parse_tag("-")))))
+        .map(|(first, rest): (ParserSpan, Vec<ParserSpan>)| {
             let mut id = first.fragment().to_string();
             for s in rest {
                 id.push_str(s.fragment());
             }
             id
-        },
-    ).parse(input)
+        })
+        .parse(input)
 }
 
 fn parse_identifier_value(input: ParserSpan) -> IResult<ParserSpan, Spanned<Value>, ParseError> {
-    spanned::spanned(|i| {
-        parse_identifier.map(
-            |s: String| {
-                Value::Word(s)
-            }
-        ).parse(i)
-    })
-        .parse(input)
+    spanned::spanned(|i| parse_identifier.map(|s: String| Value::Word(s)).parse(i)).parse(input)
 }
 
 #[cfg(test)]

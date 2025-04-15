@@ -1,5 +1,5 @@
-use crate::codemap::ParserSpan;
 use crate::Channel;
+use crate::codemap::ParserSpan;
 use indexmap::IndexMap;
 use nom::error::{FromExternalError, ParseError as NomParseError};
 use std::ops::{Deref, DerefMut};
