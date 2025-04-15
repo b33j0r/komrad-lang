@@ -366,6 +366,7 @@ fn parse_parenthesized_expr(input: ParserSpan) -> PResult<Spanned<Expr>> {
 /// A toplevel expression (number or identifier) is wrapped into Expr::Value.
 fn parse_expr_toplevel(input: ParserSpan) -> PResult<Spanned<Expr>> {
     alt((
+        parse_expander_expr,
         parse_parenthesized_expr,
         parse_list_expr,
         parse_block_or_dict,
@@ -373,6 +374,21 @@ fn parse_expr_toplevel(input: ParserSpan) -> PResult<Spanned<Expr>> {
         parse_number_value.map(|sp_val| Spanned::new(sp_val.span.clone(), Expr::Value(sp_val))),
         parse_identifier_value.map(|sp_val| Spanned::new(sp_val.span.clone(), Expr::Value(sp_val))),
     ))
+        .parse(input)
+}
+
+/// Parse an expander expression: `*{ a = b }` or `*[1 2 3]`.
+fn parse_expander_expr(input: ParserSpan) -> PResult<Spanned<Expr>> {
+    spanned::spanned(|i| {
+        preceded(
+            tag("*"),
+            preceded(space0, parse_block_or_dict),
+        )
+            .map(|block| Expr::Expander {
+                target: block,
+            })
+            .parse(i)
+    })
         .parse(input)
 }
 

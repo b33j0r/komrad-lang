@@ -153,6 +153,23 @@ impl Evaluate for Spanned<Expr> {
                     ),
                 }
             }
+            // 7) Expander expression – expand a block or list into scope
+            Expr::Expander { target } => {
+                let targ = target.evaluate(context).await;
+                match targ {
+                    Value::Block(b) => {
+                        let mut result = Value::Null;
+                        for stmt in &b.0 {
+                            result = stmt.evaluate(context).await;
+                        }
+                        result
+                    }
+                    _ => Value::Error(
+                        RuntimeError::ArgumentError("Target is not a block".to_string())
+                            .as_spanned(target.span.clone()),
+                    ),
+                }
+            }
         }
     }
 }

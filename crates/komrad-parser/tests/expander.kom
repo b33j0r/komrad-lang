@@ -1,0 +1,7 @@
+==== expander on block
+*{
+	foo bar
+}
+
+----
+(Block (Expander (Block (Tell foo (List bar)))))

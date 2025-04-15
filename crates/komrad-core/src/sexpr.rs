@@ -248,6 +248,10 @@ impl ToSExpr for Expr {
                 target.to_sexpr(),
                 index.to_sexpr(),
             ]),
+            Expander { target } => SExpr::List(vec![
+                SExpr::Atom("Expander".to_string()),
+                target.to_sexpr(),
+            ]),
         }
     }
 }

@@ -106,6 +106,11 @@ pub enum Expr {
         // The expression inside the slice brackets.
         index: Spanned<Expr>,
     },
+
+    /// An expander expression (e.g. `*{ foo = 1 }`).
+    Expander {
+        target: Spanned<Expr>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
