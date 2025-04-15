@@ -8,15 +8,15 @@ use ratatui::crossterm::event::{
 };
 use ratatui::crossterm::{
     execute,
-    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use ratatui::prelude::Line;
+use ratatui::prelude::{Line, Stylize};
 use ratatui::{
-    Terminal,
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
     style::{Color, Style},
     widgets::{Block, Borders},
+    Terminal,
 };
 use std::{error::Error, io, thread, time::Duration};
 use tokio::{select, sync::mpsc, time};
@@ -63,13 +63,14 @@ async fn interpret_input(input: &str) -> Result<String, Box<dyn Error>> {
     let top_level = parse_snippet_complete(&mut codemaps, input)
         .map_err(|e| format!("Parse error: {:?}", e))?;
     let sexpr = top_level.to_sexpr();
-    debug!("SEXPR: {}", sexpr.to_plain_string());
+    debug!("SEXPR:  {}", sexpr.to_plain_string());
 
     // Simulate a computation delay.
     time::sleep(Duration::from_millis(0)).await;
     Ok("Interpretation result".to_string())
 }
 
+/// A custom log formatter for the TUI logger that uses colors based on log levels.
 struct MyLogFormatter;
 
 impl LogFormatter for MyLogFormatter {
@@ -82,7 +83,7 @@ impl LogFormatter for MyLogFormatter {
             log::Level::Trace => Color::Gray,
             log::Level::Debug => Color::LightBlue,
             log::Level::Info => Color::LightGreen,
-            log::Level::Warn => Color::LightMagenta,
+            log::Level::Warn => Color::LightYellow,
             log::Level::Error => Color::LightRed,
         };
         textwrap::wrap(evt.msg(), width)
@@ -154,7 +155,7 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
 
     let mut input_area = TextArea::default();
     input_area.set_style(Style::default().fg(Color::Blue));
-    input_area.set_cursor_line_style(Style::default().fg(Color::Yellow));
+    input_area.set_cursor_line_style(Style::default().fg(Color::LightGreen));
 
     let mut history: Vec<String> = Vec::new();
     let mut history_index: Option<usize> = None;
@@ -165,17 +166,18 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
         terminal.draw(|f| {
             let chunks = Layout::default()
                 .direction(Direction::Vertical)
-                .margin(1)
-                .constraints([Constraint::Percentage(80), Constraint::Percentage(20)])
+                .margin(0)
+                .constraints([Constraint::Fill(100), Constraint::Min(3)])
                 .split(f.area());
 
             let logger_widget = TuiLoggerWidget::default()
-                .block(Block::default().borders(Borders::ALL).title("Output"))
+                .block(Block::default().fg(Color::LightBlue).borders(Borders::ALL).title(""))
                 .formatter(log_formatter)
                 .state(&mut logger_state);
             f.render_widget(logger_widget, chunks[0]);
 
-            input_area.set_block(Block::default().borders(Borders::ALL).title("Input"));
+            input_area.set_block(Block::default().fg(Color::LightMagenta).borders(Borders::ALL).title(""));
+            input_area.set_style(Style::default().fg(Color::LightGreen));
             f.render_widget(&input_area, chunks[1]);
         })?;
 
@@ -205,14 +207,14 @@ pub async fn main() -> Result<(), Box<dyn Error>> {
                             }
                             KeyCode::Enter => {
                                 let user_input = input_area.lines().join("\n");
-                                info!("INPUT: {}", user_input);
+                                info!("INPUT:  {}", user_input);
                                 history.push(user_input.clone());
                                 history_index = None;
                                 input_area = TextArea::default();
 
                                 match interpret_input(&user_input).await {
                                     Ok(result) => warn!("OUTPUT: {}", result),
-                                    Err(e) => error!("Error: {}", e),
+                                    Err(e) => error!("ERROR:  {}", e),
                                 }
                             }
                             KeyCode::Up => {
