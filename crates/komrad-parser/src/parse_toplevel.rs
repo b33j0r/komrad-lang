@@ -372,7 +372,10 @@ fn parse_binary_expression(input: ParserSpan) -> PResult<Spanned<Expr>> {
 
 /// Distinguish a `{ block }` vs. `{ dict }` by checking for colon usage, etc.
 fn parse_block_or_dict(input: ParserSpan) -> PResult<Spanned<Expr>> {
-    parse_block.parse(input)
+    alt((
+        parse_dict_expr,
+        parse_block,
+    )).parse(input)
 }
 
 /// A `{ ... }` block is a list of statements in braces.
@@ -397,6 +400,40 @@ fn parse_block_value(input: ParserSpan) -> PResult<Spanned<Value>> {
             .map(|block| Value::Block(Arc::new(Block(block))))
             .parse(i)
     })
+        .parse(input)
+}
+
+fn parse_dict_expr(input: ParserSpan) -> PResult<Spanned<Expr>> {
+    spanned::spanned(|i| {
+        delimited(
+            pair(char('{'), multispace0),
+            separated_list0(
+                delimited(multispace0, char(','), multispace0),
+                parse_dict_entry,
+            ),
+            preceded(opt(delimited(multispace0, char(','), multispace0)), preceded(multispace0, char('}'))),
+        )
+            .map(|entries| {
+                let mut index_map = indexmap::IndexMap::new();
+                for (entry, value) in entries {
+                    index_map.insert(entry, value);
+                }
+                Expr::Dict { index_map }
+            })
+            .parse(i)
+    })
+        .parse(input)
+}
+
+
+fn parse_dict_entry(input: ParserSpan) -> PResult<(String, Spanned<Expr>)> {
+    pair(
+        parse_identifier,
+        preceded(
+            preceded(multispace0, tag(":")),
+            preceded(multispace0, parse_expression),
+        ),
+    )
         .parse(input)
 }
 

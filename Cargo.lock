@@ -717,6 +717,7 @@ name = "komrad-parser"
 version = "0.1.0"
 dependencies = [
  "glob",
+ "indexmap",
  "komrad-core",
  "miette",
  "nom",

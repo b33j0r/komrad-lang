@@ -1,7 +1,8 @@
-use crate::AsSpanned;
 use crate::ast::{Expr, Operator, RuntimeError, Spanned, Value};
 use crate::env::Env;
+use crate::AsSpanned;
 use async_trait::async_trait;
+use indexmap::IndexMap;
 
 #[allow(dead_code)]
 pub struct EvaluationContext {
@@ -33,9 +34,9 @@ impl Evaluate for Expr {
     async fn evaluate(&self, context: &mut EvaluationContext) -> Value {
         match self {
             Expr::Value(Spanned {
-                value: box Value::Word(name),
-                span,
-            }) => Value::Error(
+                            value: box Value::Word(name),
+                            span,
+                        }) => Value::Error(
                 RuntimeError::ArgumentError(format!("Undefined variable: {}", name))
                     .as_spanned(span.clone()),
             ),
@@ -47,6 +48,15 @@ impl Evaluate for Expr {
                     evaluated_elements.push(value);
                 }
                 Value::List(evaluated_elements)
+            }
+            Expr::Dict { index_map } => {
+                let mut evaluated_map = IndexMap::new();
+                for (key, value) in index_map {
+                    let key_val = key.clone();
+                    let value_val = value.value.evaluate(context).await;
+                    evaluated_map.insert(key_val, value_val);
+                }
+                Value::Dict(evaluated_map)
             }
             Expr::BinaryExpr { lhs, op, rhs } => {
                 let left_val = lhs.value.evaluate(context).await;
@@ -72,7 +82,7 @@ impl Evaluate for Expr {
                             RuntimeError::ArgumentError(
                                 "Type mismatch in multiplication".to_string(),
                             )
-                            .as_spanned(rhs.span.clone()),
+                                .as_spanned(rhs.span.clone()),
                         ),
                     },
                     box Operator::Divide => match (left_val, right_val) {
@@ -291,9 +301,9 @@ mod tests {
         let result = expr.evaluate(&mut context).await;
         match result {
             Value::Error(Spanned {
-                value: box RuntimeError::ArgumentError(msg),
-                ..
-            }) => {
+                             value: box RuntimeError::ArgumentError(msg),
+                             ..
+                         }) => {
                 assert_eq!(msg, "Divide by zero");
             }
             _ => panic!("Expected a division by zero error"),
@@ -433,10 +443,10 @@ mod tests {
         let result = expr.evaluate(&mut context).await;
         match result {
             Value::Error(Spanned {
-                span,
-                value: box RuntimeError::ArgumentError(msg),
-                ..
-            }) => {
+                             span,
+                             value: box RuntimeError::ArgumentError(msg),
+                             ..
+                         }) => {
                 assert_eq!(msg, "Index out of bounds");
                 assert_eq!(span.file_id, 1);
                 assert_eq!(span.start, 2);

@@ -1,0 +1,24 @@
+==== dict empty
+a = {}
+
+----
+(Block (Assign (Variable a) (Dict)))
+
+==== dict with one item
+a = {a: 1}
+
+----
+(Block (Assign (Variable a) (Dict ("a" 1))))
+
+==== dict with one item and inner space
+a = { a: 1 }
+
+----
+(Block (Assign (Variable a) (Dict ("a" 1))))
+
+==== dict with two items
+a = {
+	a: 1, b: 2
+}
+----
+(Block (Assign (Variable a) (Dict ("a" 1) ("b" 2))))

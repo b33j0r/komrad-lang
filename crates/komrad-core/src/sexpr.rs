@@ -230,6 +230,16 @@ impl ToSExpr for Expr {
                 }
                 SExpr::List(vec)
             }
+            Dict { index_map } => {
+                let mut vec = vec![SExpr::Atom("Dict".to_string())];
+                for (key, value) in index_map {
+                    vec.push(SExpr::List(vec![
+                        key.to_sexpr(),
+                        value.to_sexpr(),
+                    ]));
+                }
+                SExpr::List(vec)
+            }
             BinaryExpr { lhs, op, rhs } => SExpr::List(vec![
                 SExpr::Atom("BinaryExpr".to_string()),
                 lhs.to_sexpr(),
@@ -259,6 +269,16 @@ impl ToSExpr for Value {
                 let mut sexprs = vec![SExpr::Atom("List".to_string())];
                 for v in list {
                     sexprs.push(v.to_sexpr());
+                }
+                SExpr::List(sexprs)
+            }
+            Dict(dict) => {
+                let mut sexprs = vec![SExpr::Atom("Dict".to_string())];
+                for (key, value) in dict {
+                    sexprs.push(SExpr::List(vec![
+                        SExpr::Atom(key.to_string()),
+                        value.to_sexpr(),
+                    ]));
                 }
                 SExpr::List(sexprs)
             }

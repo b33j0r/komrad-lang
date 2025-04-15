@@ -1,5 +1,6 @@
 use crate::codemap::ParserSpan;
 use crate::Channel;
+use indexmap::IndexMap;
 use nom::error::{FromExternalError, ParseError as NomParseError};
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
@@ -193,6 +194,8 @@ pub enum Value {
     Channel(crate::channel::Channel),
     /// Represents a list of values.
     List(Vec<Value>),
+    /// Represents a dict of values.
+    Dict(IndexMap<String, Value>),
     /// Represents a symbol or identifier.
     Word(String),
     Boolean(bool),
@@ -319,6 +322,11 @@ pub enum Expr {
 
     /// A list expression, each element spanned.
     List { elements: Vec<Spanned<Expr>> },
+
+    /// A dictionary expression, each key-value pair spanned.
+    Dict {
+        index_map: IndexMap<String, Spanned<Expr>>,
+    },
 
     /// A binary operation (e.g., `lhs + rhs`).
     BinaryExpr {
