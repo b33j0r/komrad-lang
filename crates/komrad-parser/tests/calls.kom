@@ -11,3 +11,12 @@ a = foo bar + baz
 
 ----
 (Block (Assign (Variable a) (Ask foo (List (BinaryExpr bar + baz)))))
+
+
+==== call ask with block
+
+a = foo bar {
+	baz = quz
+}
+----
+(Block (Assign (Variable a) (Ask foo (List bar (Block (Assign (Variable baz) quz))))))
