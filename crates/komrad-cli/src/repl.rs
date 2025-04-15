@@ -110,13 +110,16 @@ impl LogFormatter for MyLogFormatter {
 // -- snip previous imports --
 
 pub async fn main(mut interpreter: Interpreter, file: Option<PathBuf>) -> Result<(), Box<dyn Error>> {
+    tui_logger::init_logger(LevelFilter::Trace)?;
+    tracing::subscriber::set_global_default(Registry::default().with(TuiTracingSubscriberLayer))?;
+
     if let Some(file) = file {
         if !file.exists() {
             return Err(format!("File not found: {}", file.display()).into());
         }
         match interpreter.load_and_run_file_path(&file).await {
             Ok(_) => {
-                info!("File executed successfully.");
+                info!("Loaded {}", file.display());
             }
             Err(e) => {
                 error!("Error executing file: {}", e);
@@ -124,9 +127,6 @@ pub async fn main(mut interpreter: Interpreter, file: Option<PathBuf>) -> Result
             }
         }
     }
-
-    tui_logger::init_logger(LevelFilter::Trace)?;
-    tracing::subscriber::set_global_default(Registry::default().with(TuiTracingSubscriberLayer))?;
 
     let shutdown_token = CancellationToken::new();
     let shutdown_ctrlc = shutdown_token.clone();
