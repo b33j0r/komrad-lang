@@ -203,10 +203,10 @@ mod tests {
             crate::ast::Span::default(),
             Expr::Value(Spanned::new(crate::ast::Span::default(), block_value)),
         );
-        let handler = Handler {
+        let handler = Arc::new(Handler {
             pattern: Pattern::new_word("foo".to_string()),
             expr: spanned_value,
-        };
+        });
         env.push_handler(handler).await;
 
         // Clone a child environment
