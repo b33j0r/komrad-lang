@@ -18,6 +18,7 @@ use ratatui::{
     widgets::{Block, Borders},
     Terminal,
 };
+use std::path::{Path, PathBuf};
 use std::{error::Error, io, thread, time::Duration};
 use tokio::{select, sync::mpsc, time};
 use tokio_util::sync::CancellationToken;
@@ -108,8 +109,21 @@ impl LogFormatter for MyLogFormatter {
 
 // -- snip previous imports --
 
-pub async fn main() -> Result<(), Box<dyn Error>> {
-    let mut interpreter = Interpreter::new();
+pub async fn main(mut interpreter: Interpreter, file: Option<PathBuf>) -> Result<(), Box<dyn Error>> {
+    if let Some(file) = file {
+        if !file.exists() {
+            return Err(format!("File not found: {}", file.display()).into());
+        }
+        match interpreter.load_and_run_file_path(&file).await {
+            Ok(_) => {
+                info!("File executed successfully.");
+            }
+            Err(e) => {
+                error!("Error executing file: {}", e);
+                return Err(e.into());
+            }
+        }
+    }
 
     tui_logger::init_logger(LevelFilter::Trace)?;
     tracing::subscriber::set_global_default(Registry::default().with(TuiTracingSubscriberLayer))?;

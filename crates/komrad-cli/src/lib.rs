@@ -1,1 +1,2 @@
-pub mod repl;
+mod repl;
+pub mod cli;
