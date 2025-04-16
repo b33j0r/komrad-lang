@@ -18,6 +18,8 @@ pub(crate) async fn main(mut interpreter: Interpreter, file_path: &PathBuf, wait
         }
     }
 
+    tokio::time::sleep(std::time::Duration::from_secs(0)).await;
+
     if wait {
         info!("Press Ctrl+C to exit.");
 
