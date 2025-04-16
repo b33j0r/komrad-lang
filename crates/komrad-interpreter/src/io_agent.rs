@@ -3,6 +3,7 @@ use komrad_core::{Agent, AgentLifecycle, Message, MessageHandler, Value};
 use komrad_macros::Agent;
 use std::convert::TryFrom;
 use std::sync::Arc;
+use tracing::{debug, warn};
 
 //
 // IoInterface: allows swapping out the I/O implementation.
@@ -97,6 +98,7 @@ impl TryFrom<Message> for IoAgentMessage {
 #[async_trait]
 impl MessageHandler for IoAgent {
     async fn on_message(&mut self, message: &Message) -> Option<Value> {
+        warn!("Received message: {:?}", message.value());
         // Convert the incoming message into an IoAgentMessage.
         let io_msg = match IoAgentMessage::try_from(message.clone()) {
             Ok(m) => m,

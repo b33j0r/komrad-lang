@@ -3,7 +3,10 @@ use indexmap::IndexMap;
 use std::sync::Arc;
 use tracing::{debug, error, info, trace};
 
-use komrad_core::{Agent, AgentLifecycle, Block, Channel, Destructure, DestructureResult, Env, Evaluate, Message, MessageHandler, PatternDestructure, ToSExpr, Value};
+use komrad_core::{
+    Agent, AgentLifecycle, Block, Channel, Destructure, DestructureResult, Env, Evaluate, Expr,
+    Message, MessageHandler, PatternDestructure, ToSExpr, Value,
+};
 use komrad_macros::Agent;
 
 /// A DynamicAgent that, when initialized, evaluates its associated block
@@ -30,11 +33,7 @@ impl DynamicAgent {
 
 #[async_trait]
 impl AgentLifecycle for DynamicAgent {
-    async fn on_init(
-        &mut self,
-        channel: Channel,
-        initializer_map: IndexMap<String, Value>,
-    ) {
+    async fn on_init(&mut self, channel: Channel, initializer_map: IndexMap<String, Value>) {
         info!("DynamicAgent on_init");
         // Provide "me" so code in the block can reference itself.
         self.me = Some(channel.clone());
@@ -47,9 +46,16 @@ impl AgentLifecycle for DynamicAgent {
         let mut initializer_result = Value::Null;
         for stmt in &self.block.0 {
             initializer_result = stmt.evaluate(&mut self.env).await;
-            debug!("DynamicAgent block stmt: {:?} => {:?}", stmt.to_sexpr(), initializer_result.to_sexpr());
+            debug!(
+                "DynamicAgent block stmt: {:?} => {:?}",
+                stmt.to_sexpr(),
+                initializer_result.to_sexpr()
+            );
         }
-        debug!("DynamicAgent block result: {:?}", initializer_result.to_sexpr());
+        debug!(
+            "DynamicAgent block result: {:?}",
+            initializer_result.to_sexpr()
+        );
 
         // Apply additional initializer bindings (like the old system).
         for (key, value) in initializer_map {
@@ -73,7 +79,10 @@ impl AgentLifecycle for DynamicAgent {
         // That triggers any handler matching ["start"], etc.
         let start_msg = Message::new(Value::List(vec![Value::Word("start".to_string())]), None);
         let reply = self.on_message(&start_msg).await;
-        info!("DynamicAgent on_start; forced 'start' message => {:?}", reply.to_sexpr());
+        info!(
+            "DynamicAgent on_start; forced 'start' message => {:?}",
+            reply.to_sexpr()
+        );
     }
 
     async fn on_stop(&mut self) {
@@ -94,16 +103,17 @@ impl AgentLifecycle for DynamicAgent {
 #[async_trait]
 impl MessageHandler for DynamicAgent {
     async fn on_message(&mut self, message: &Message) -> Option<Value> {
-        trace!("DynamicAgent received message: {:?}", message);
+        trace!("DynamicAgent received message: {:?}", message.to_sexpr());
 
         // Attempt to match the incoming message’s value against each handler’s pattern.
         let handlers = self.env.handlers().await;
         for handler in &handlers {
             let pattern = &handler.pattern.value;
+            debug!("DynamicAgent handler pattern: {:?}", pattern.to_sexpr());
             let destruct = PatternDestructure::destructure(pattern, message.value());
             match destruct {
                 DestructureResult::Match(bindings) => {
-                    trace!("DynamicAgent handler matched: {:?}", pattern);
+                    debug!("DynamicAgent handler matched: {:?}", pattern.to_sexpr());
 
                     // Create a handler scope so changes propagate up if the variable already existed.
                     let mut child_env = self.env.clone_handler_scope().await;
@@ -112,9 +122,36 @@ impl MessageHandler for DynamicAgent {
                         child_env.set(&k, v).await;
                     }
 
-                    // Evaluate the handler's expression. In your new AST, that’s `handler.expr`.
-                    let result = handler.expr.evaluate(&mut self.env).await;
-                    return Some(result);
+                    // Evaluate the handler's expression.
+                    match &*handler.expr {
+                        Expr::Value(spanned_value) => {
+                            match &*spanned_value.value {
+                                Value::Block(block) => {
+                                    // Evaluate the block in the handler's environment
+                                    let mut result = Value::Null;
+                                    for stmt in &block.0 {
+                                        result = stmt.evaluate(&mut child_env).await;
+                                        debug!(
+                                            "Handler block stmt: {:?} => {:?}",
+                                            stmt.to_sexpr(),
+                                            result.to_sexpr()
+                                        );
+                                    }
+                                    return Some(result);
+                                }
+                                _ => {
+                                    // If the handler's expression is not a block, we evaluate it directly.
+                                    let result = handler.expr.evaluate(&mut child_env).await;
+                                    return Some(result);
+                                }
+                            }
+                        }
+                        _ => {
+                            // If the handler's expression is not a Value variant, we evaluate it directly.
+                            let result = handler.expr.evaluate(&mut child_env).await;
+                            return Some(result);
+                        }
+                    }
                 }
                 DestructureResult::NoMatch => {
                     // keep looking

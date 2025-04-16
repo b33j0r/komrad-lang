@@ -1,5 +1,6 @@
 use crate::error::RuntimeError;
 use crate::value::Value;
+use crate::{SExpr, ToSExpr};
 use std::fmt::Debug;
 use std::sync::Arc;
 use tokio::sync::{mpsc, Mutex};
@@ -20,6 +21,20 @@ impl Default for Message {
             uuid: uuid::Uuid::now_v7(),
             value: Value::Null,
             reply_to: None,
+        }
+    }
+}
+
+impl ToSExpr for Message {
+    fn to_sexpr(&self) -> SExpr {
+        let mut terms = vec![self.value.to_sexpr()];
+        if let Some(reply_to) = &self.reply_to {
+            terms.push(Value::Channel(reply_to.clone()).to_sexpr());
+        }
+        if !terms.is_empty() {
+            SExpr::List(terms)
+        } else {
+            SExpr::Nil
         }
     }
 }

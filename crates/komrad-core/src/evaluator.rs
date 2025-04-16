@@ -34,10 +34,7 @@ impl Evaluate for Spanned<Expr> {
                     // If it's a variable ("Word"), look it up.
                     Value::Word(name) => match env.get(name).await {
                         Some(v) => v,
-                        None => Value::Error(
-                            RuntimeError::ArgumentError(format!("Undefined variable: {}", name))
-                                .as_spanned(sp_val.span.clone()),
-                        ),
+                        None => Value::Word(name.clone()),
                     },
                     // Otherwise, propagate the literal.
                     other => other.clone(),
