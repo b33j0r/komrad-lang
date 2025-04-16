@@ -1,0 +1,13 @@
+Server = {
+	port = 8080
+	host = "localhost"
+
+	[start] {
+		Io println "Starting server on http://" + host + ":" + port
+		Log info "Starting server on http://" + host + ":" + port
+	}
+}
+
+server = spawn Server {
+	host: "0.0.0.0"
+}

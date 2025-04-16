@@ -67,6 +67,20 @@ impl Evaluate for Spanned<Expr> {
                         (Value::Int(a), Value::Float(b)) => Value::Float(a as f64 + b),
                         (Value::Float(a), Value::Int(b)) => Value::Float(a + b as f64),
                         (Value::String(a), Value::String(b)) => Value::String(a + &b),
+                        // String + Int
+                        (Value::String(a), Value::Int(n)) => {
+                            format!("{a}{n}").into()
+                        }
+                        (Value::Int(n), Value::String(a)) => {
+                            format!("{n}{a}").into()
+                        }
+                        // String + Float
+                        (Value::String(a), Value::Float(n)) => {
+                            format!("{a}{n}").into()
+                        }
+                        (Value::Float(n), Value::String(a)) => {
+                            format!("{n}{a}").into()
+                        }
                         (Value::List(mut a), Value::List(b)) => {
                             a.extend(b);
                             Value::List(a)
