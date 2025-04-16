@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 async-trait.workspace = true
+bytes.workspace = true
 dashmap.workspace = true
 indexmap.workspace = true
 owo-colors.workspace = true

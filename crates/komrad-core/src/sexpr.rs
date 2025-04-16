@@ -2,6 +2,7 @@ use crate::ast::{
     AssignmentTarget, Block, Expr, Handler, Operator, Pattern, Predicate, Statement,
 };
 use crate::{Spanned, TopLevel};
+use bytes::Bytes;
 use std::fmt::Debug;
 use std::sync::Arc;
 
@@ -258,26 +259,25 @@ impl ToSExpr for Expr {
 
 impl ToSExpr for Value {
     fn to_sexpr(&self) -> SExpr {
-        use crate::value::Value::*;
         match self {
-            Null => SExpr::Atom("null".to_string()),
-            Error(e) => SExpr::List(vec![SExpr::Atom("Error".to_string()), e.to_sexpr()]),
-            RemoteError(e) => SExpr::List(vec![
+            Value::Null => SExpr::Atom("null".to_string()),
+            Value::Error(e) => SExpr::List(vec![SExpr::Atom("Error".to_string()), e.to_sexpr()]),
+            Value::RemoteError(e) => SExpr::List(vec![
                 SExpr::Atom("RemoteError".to_string()),
                 SExpr::Atom(e.to_string()),
             ]),
-            Channel(c) => SExpr::List(vec![
+            Value::Channel(c) => SExpr::List(vec![
                 SExpr::Atom("Channel".to_string()),
                 SExpr::Atom(format!("{:?}", c)),
             ]),
-            List(list) => {
+            Value::List(list) => {
                 let mut sexprs = vec![SExpr::Atom("List".to_string())];
                 for v in list {
                     sexprs.push(v.to_sexpr());
                 }
                 SExpr::List(sexprs)
             }
-            Dict(dict) => {
+            Value::Dict(dict) => {
                 let mut sexprs = vec![SExpr::Atom("Dict".to_string())];
                 for (key, value) in dict {
                     sexprs.push(SExpr::List(vec![
@@ -287,15 +287,34 @@ impl ToSExpr for Value {
                 }
                 SExpr::List(sexprs)
             }
-            Word(w) => SExpr::Atom(w.to_string()),
-            Boolean(b) => SExpr::Atom(b.to_string()),
-            String(s) => SExpr::String(s.clone()),
-            Int(i) => SExpr::Atom(i.to_string()),
-            Float(f) => SExpr::Atom(f.to_string()),
-            Uuid(u) => SExpr::Atom(u.to_string()),
-            Block(arc_block) => arc_block.to_sexpr(),
+            Value::Word(w) => SExpr::Atom(w.to_string()),
+            Value::Boolean(b) => SExpr::Atom(b.to_string()),
+            Value::String(s) => SExpr::String(s.clone()),
+            Value::Int(i) => SExpr::Atom(i.to_string()),
+            Value::Float(f) => SExpr::Atom(f.to_string()),
+            Value::Uuid(u) => SExpr::Atom(u.to_string()),
+            Value::Block(arc_block) => arc_block.to_sexpr(),
+            Value::Bytes(arc_bytes) => {
+                let bytes_str = bytes_digest(arc_bytes, 64);
+                SExpr::List(vec![SExpr::Atom("Bytes".to_string()), SExpr::String(bytes_str)])
+            }
         }
     }
+}
+
+/// Converts a large `Bytes` object to a digest string for display.
+/// For large data, only shows the head and tail of the byte string.
+fn bytes_digest(arc_bytes: &Arc<Bytes>, max_length: usize) -> String {
+    if arc_bytes.len() <= max_length {
+        return format!("{:?}", arc_bytes);
+    }
+    let head = &arc_bytes[..max_length / 2];
+    let tail = &arc_bytes[arc_bytes.len() - max_length / 2..];
+    format!(
+        "{:?} ... {:?}",
+        head,
+        tail
+    )
 }
 
 impl ToSExpr for Operator {

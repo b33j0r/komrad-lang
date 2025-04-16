@@ -7,6 +7,8 @@ edition = "2024"
 komrad-core = { path = "../komrad-core" }
 komrad-macros = { path = "../komrad-macros" }
 komrad-parser = { path = "../komrad-parser" }
+komrad-web = { path = "../komrad-web" }
+
 tokio.workspace = true
 async-trait.workspace = true
 indexmap.workspace = true

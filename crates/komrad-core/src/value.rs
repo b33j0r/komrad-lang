@@ -23,6 +23,7 @@ pub enum Value {
     /// Represents a sequence of statements, often used as a closure or handler body.
     Block(Arc<Block>),
     RemoteError(String),
+    Bytes(Arc<bytes::Bytes>),
 }
 
 impl From<Channel> for Value {

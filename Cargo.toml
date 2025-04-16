@@ -9,10 +9,13 @@ komrad-cli = { path = "crates/komrad-cli" }
 
 [workspace]
 resolver = "3"
-members = ["crates/komrad-cli", "crates/komrad-core", "crates/komrad-interpreter", "crates/komrad-macros", "crates/komrad-parser"]
+members = ["crates/komrad-cli", "crates/komrad-core", "crates/komrad-interpreter", "crates/komrad-macros", "crates/komrad-parser", "crates/komrad-web"]
 
 [workspace.dependencies]
 async-trait = "0.1.88"
+bytes = "1.10.1"
+base64 = "0.22.1"
+sha1 = "0.11.0-pre.5"
 dashmap = "7.0.0-rc2"
 indexmap = "2.9.0"
 owo-colors = { version = "4.2.0", features = ["alloc"] }
