@@ -1,10 +1,15 @@
 Server = {
 	port = 8080
 	host = "localhost"
+	listener = null
 
 	[start] {
-		Io println "Starting server on http://" + host + ":" + port
 		Log info "Starting server on http://" + host + ":" + port
+		listener = spawn HttpListener {
+			port: port
+			host: host
+			delegate: me
+		}
 	}
 }
 

@@ -9,9 +9,7 @@ use komrad_core::{Operator, Span, Spanned};
 use komrad_core::{ParseError, Pattern};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
-use nom::character::complete::{
-    alpha1, char, line_ending, multispace0, multispace1, not_line_ending, space0, space1,
-};
+use nom::character::complete::{alpha1, char, line_ending, multispace0, multispace1, not_line_ending, space0, space1};
 use nom::combinator::{map, opt};
 use nom::multi::{many0, many1, separated_list0, separated_list1};
 use nom::sequence::{delimited, pair, preceded};
@@ -508,7 +506,7 @@ fn parse_dict_expr(input: ParserSpan) -> PResult<Spanned<Expr>> {
         delimited(
             pair(char('{'), multispace0),
             separated_list0(
-                delimited(multispace0, char(','), multispace0),
+                alt((delimited(multispace0, tag(","), multispace0), multispace1)),
                 parse_dict_entry,
             ),
             preceded(
