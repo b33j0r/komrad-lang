@@ -1,5 +1,6 @@
-use crate::fs_agent::FsAgent;
-use crate::io_agent::IoAgent;
+use crate::agents::fs_agent::FsAgent;
+use crate::agents::io_agent::IoAgent;
+use crate::agents::log_agent::LogAgent;
 use crate::spawn_agent::SpawnAgent;
 use komrad_core::{Agent, AgentFactory, RuntimeError};
 use komrad_core::{CodeAtlas, Env, Evaluate, Spanned, Statement, TopLevel, Value};
@@ -39,6 +40,10 @@ impl Interpreter {
         let fs_agent = FsAgent::default();
         let fs_agent_channel = fs_agent.spawn();
         initial_bindings.insert("Fs".to_string(), Value::Channel(fs_agent_channel));
+
+        let log_agent = LogAgent::default();
+        let log_agent_channel = log_agent.spawn();
+        initial_bindings.insert("Log".to_string(), Value::Channel(log_agent_channel));
 
         let mut env = Env::new(initial_bindings.clone(), initial_handlers);
 
