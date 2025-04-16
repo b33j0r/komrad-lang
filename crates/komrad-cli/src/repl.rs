@@ -110,7 +110,7 @@ impl LogFormatter for MyLogFormatter {
 // -- snip previous imports --
 
 pub async fn main(mut interpreter: Interpreter, file: &Option<PathBuf>) -> Result<(), Box<dyn Error>> {
-    tui_logger::init_logger(LevelFilter::Trace)?;
+    tui_logger::init_logger(LevelFilter::Debug)?;
     tracing::subscriber::set_global_default(Registry::default().with(TuiTracingSubscriberLayer))?;
 
     if let Some(file) = file {

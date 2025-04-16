@@ -109,11 +109,11 @@ impl MessageHandler for DynamicAgent {
         let handlers = self.env.handlers().await;
         for handler in &handlers {
             let pattern = &handler.pattern.value;
-            debug!("DynamicAgent handler pattern: {:?}", pattern.to_sexpr());
+            trace!("DynamicAgent handler pattern: {:?}", pattern.to_sexpr());
             let destruct = PatternDestructure::destructure(pattern, message.value());
             match destruct {
                 DestructureResult::Match(bindings) => {
-                    debug!("DynamicAgent handler matched: {:?}", pattern.to_sexpr());
+                    trace!("DynamicAgent handler matched: {:?}", pattern.to_sexpr());
 
                     // Create a handler scope so changes propagate up if the variable already existed.
                     let mut child_env = self.env.clone_handler_scope().await;
@@ -126,12 +126,13 @@ impl MessageHandler for DynamicAgent {
                     match &*handler.expr {
                         Expr::Value(spanned_value) => {
                             match &*spanned_value.value {
+                                // For block we actually have to evaluate the statements
                                 Value::Block(block) => {
                                     // Evaluate the block in the handler's environment
                                     let mut result = Value::Null;
                                     for stmt in &block.0 {
                                         result = stmt.evaluate(&mut child_env).await;
-                                        debug!(
+                                        trace!(
                                             "Handler block stmt: {:?} => {:?}",
                                             stmt.to_sexpr(),
                                             result.to_sexpr()
