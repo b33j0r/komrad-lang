@@ -63,6 +63,18 @@ impl Evaluate for Spanned<Expr> {
                 match op.value.as_ref() {
                     Operator::Add => match (left, right) {
                         (Value::Int(a), Value::Int(b)) => Value::Int(a + b),
+                        (Value::Float(a), Value::Float(b)) => Value::Float(a + b),
+                        (Value::Int(a), Value::Float(b)) => Value::Float(a as f64 + b),
+                        (Value::Float(a), Value::Int(b)) => Value::Float(a + b as f64),
+                        (Value::String(a), Value::String(b)) => Value::String(a + &b),
+                        (Value::List(mut a), Value::List(b)) => {
+                            a.extend(b);
+                            Value::List(a)
+                        }
+                        (Value::Dict(mut a), Value::Dict(b)) => {
+                            a.extend(b);
+                            Value::Dict(a)
+                        }
                         _ => Value::Error(
                             RuntimeError::ArgumentError("Type mismatch in addition".to_string())
                                 .as_spanned(rhs.span.clone()),
@@ -70,6 +82,10 @@ impl Evaluate for Spanned<Expr> {
                     },
                     Operator::Subtract => match (left, right) {
                         (Value::Int(a), Value::Int(b)) => Value::Int(a - b),
+                        (Value::Float(a), Value::Float(b)) => Value::Float(a - b),
+                        (Value::Int(a), Value::Float(b)) => Value::Float(a as f64 - b),
+                        (Value::Float(a), Value::Int(b)) => Value::Float(a - b as f64),
+                        (Value::String(a), Value::String(b)) => Value::String(a.replacen(&b, "", 1)),
                         _ => Value::Error(
                             RuntimeError::ArgumentError("Type mismatch in subtraction".to_string())
                                 .as_spanned(rhs.span.clone()),
@@ -77,6 +93,18 @@ impl Evaluate for Spanned<Expr> {
                     },
                     Operator::Multiply => match (left, right) {
                         (Value::Int(a), Value::Int(b)) => Value::Int(a * b),
+                        (Value::Float(a), Value::Float(b)) => Value::Float(a * b),
+                        (Value::Int(a), Value::Float(b)) => Value::Float(a as f64 * b),
+                        (Value::Float(a), Value::Int(b)) => Value::Float(a * b as f64),
+                        (Value::String(a), Value::Int(b)) => {
+                            if b < 0 {
+                                return Value::Error(
+                                    RuntimeError::ArgumentError("Negative repeat count".to_string())
+                                        .as_spanned(rhs.span.clone()),
+                                );
+                            }
+                            Value::String(a.repeat(b as usize))
+                        }
                         _ => Value::Error(
                             RuntimeError::ArgumentError(
                                 "Type mismatch in multiplication".to_string(),
@@ -90,13 +118,40 @@ impl Evaluate for Spanned<Expr> {
                                 .as_spanned(rhs.span.clone()),
                         ),
                         (Value::Int(a), Value::Int(b)) => Value::Int(a / b),
+                        (Value::Float(a), Value::Float(b)) => Value::Float(a / b),
+                        (Value::Int(a), Value::Float(b)) => Value::Float(a as f64 / b),
+                        (Value::Float(a), Value::Int(b)) => Value::Float(a / b as f64),
+                        // for strings, split the string by the divisor
+                        (Value::String(a), Value::String(b)) => {
+                            if b.is_empty() {
+                                return Value::Error(
+                                    RuntimeError::ArgumentError("Divide by zero".to_string())
+                                        .as_spanned(rhs.span.clone()),
+                                );
+                            }
+                            Value::List(a.split(&b).map(|s| Value::String(s.to_string())).collect())
+                        }
                         _ => Value::Error(
                             RuntimeError::ArgumentError("Type mismatch in division".to_string())
                                 .as_spanned(rhs.span.clone()),
                         ),
                     },
+                    Operator::Mod => match (left, right) {
+                        (Value::Int(_), Value::Int(0)) => Value::Error(
+                            RuntimeError::ArgumentError("Divide by zero".to_string())
+                                .as_spanned(rhs.span.clone()),
+                        ),
+                        (Value::Int(a), Value::Int(b)) => Value::Int(a % b),
+                        (Value::Float(a), Value::Float(b)) => Value::Float(a % b),
+                        (Value::Int(a), Value::Float(b)) => Value::Float(a as f64 % b),
+                        (Value::Float(a), Value::Int(b)) => Value::Float(a % b as f64),
+                        _ => Value::Error(
+                            RuntimeError::ArgumentError("Type mismatch in modulus".to_string())
+                                .as_spanned(rhs.span.clone()),
+                        ),
+                    },
                     _ => Value::Error(
-                        RuntimeError::UnknownError("Unknown operator".to_string())
+                        RuntimeError::UnknownError("Operator not implemented".to_string())
                             .as_spanned(op.span.clone()),
                     ),
                 }

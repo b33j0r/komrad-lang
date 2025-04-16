@@ -15,3 +15,33 @@ a = 1 + (2 + 3)
 
 ----
 (Block (Assign (Variable a) (BinaryExpr 1 + (BinaryExpr 2 + 3))))
+
+
+==== binary with string and variable
+a = "foo" + b
+
+----
+(Block (Assign (Variable a) (BinaryExpr "foo" + b)))
+
+==== binary with string and variable chained
+a = "foo" + b + c
+
+----
+(Block (Assign (Variable a) (BinaryExpr (BinaryExpr "foo" + b) + c)))
+
+
+==== binary in tell with string and variable
+
+Io println "foo" + b
+
+
+----
+(Block (Tell Io (List println (BinaryExpr "foo" + b))))
+
+
+==== binary in ask with string and variable
+
+a = Io println "foo" + b
+
+----
+(Block (Assign (Variable a) (Ask Io (List println (BinaryExpr "foo" + b)))))

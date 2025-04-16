@@ -1,5 +1,3 @@
-// parse_toplevel
-
 use crate::parse_strings::parse_string_value;
 use crate::result::PResult;
 use crate::spanned;
@@ -11,7 +9,9 @@ use komrad_core::{Operator, Span, Spanned};
 use komrad_core::{ParseError, Pattern};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
-use nom::character::complete::{alpha1, char, line_ending, multispace0, multispace1, not_line_ending, space0, space1};
+use nom::character::complete::{
+    alpha1, char, line_ending, multispace0, multispace1, not_line_ending, space0, space1,
+};
 use nom::combinator::{map, opt};
 use nom::multi::{many0, many1, separated_list0, separated_list1};
 use nom::sequence::{delimited, pair, preceded};
@@ -19,30 +19,26 @@ use nom::{Err as NomErr, IResult, Parser};
 use std::path::PathBuf;
 use std::sync::Arc;
 
-// --------------------------------------------
-// Low-level wrappers for built-in combinators.
-// (These are used for things like tag and digit1.)
-// --------------------------------------------
+/// A small wrapper around `nom::bytes::complete::tag` so it returns our error type.
 fn parse_tag<'a>(
     t: &'static str,
 ) -> impl FnMut(ParserSpan<'a>) -> IResult<ParserSpan<'a>, ParserSpan<'a>, ParseError> {
     move |input: ParserSpan<'a>| nom::bytes::complete::tag(t).parse(input)
 }
 
+/// A small wrapper around `nom::character::complete::digit1`.
 fn parse_digit1(input: ParserSpan<'_>) -> IResult<ParserSpan<'_>, ParserSpan<'_>, ParseError> {
     nom::character::complete::digit1(input)
 }
 
-// --------------------------------------------
-// The top-level file parser.
-// --------------------------------------------
+/// The main entry point for parsing an entire file into a `TopLevel::Block`.
 pub fn parse_file_complete(
     codemaps: &mut CodeAtlas,
     source: &str,
     file_path: Option<PathBuf>,
 ) -> Result<TopLevel, ParseError> {
     let initial_span = codemaps.add_file(source, file_path);
-    match parse_statements(initial_span.clone()) {
+    match parse_statements.parse(initial_span.clone()) {
         Ok((remaining, statements)) => {
             if !remaining.fragment().is_empty() {
                 Err(ParseError::Incomplete {
@@ -61,12 +57,13 @@ pub fn parse_file_complete(
     }
 }
 
+/// Similar to `parse_file_complete` but for shorter snippet inputs, no file path.
 pub fn parse_snippet_complete(
     codemaps: &mut CodeAtlas,
     source: &str,
 ) -> Result<TopLevel, ParseError> {
     let initial_span = codemaps.add_file(source, None);
-    match parse_statements(initial_span.clone()) {
+    match parse_statements.parse(initial_span.clone()) {
         Ok((remaining, statements)) => {
             if !remaining.fragment().is_empty() {
                 Err(ParseError::Incomplete {
@@ -85,13 +82,9 @@ pub fn parse_snippet_complete(
     }
 }
 
-// --------------------------------------------
-// parse_statements & parse_statement
-// Parse many statements separated by newlines or whitespace.
-// --------------------------------------------
+/// Parses multiple statements separated by newlines, filtering out blank lines.
 fn parse_statements(input: ParserSpan) -> PResult<Vec<Spanned<Statement>>> {
-    // Use the old logic: use many1(preceded(opt(space0), line_ending)) as the separator.
-    // After parsing, filter out blank lines.
+    // Splits statements by one or more line breaks. Blank lines become Statement::BlankLine.
     delimited(
         multispace0,
         separated_list0(many1(preceded(opt(space0), line_ending)), parse_statement),
@@ -106,6 +99,7 @@ fn parse_statements(input: ParserSpan) -> PResult<Vec<Spanned<Statement>>> {
         .parse(input)
 }
 
+/// Parses a single statement: assignment, handler, tell, expression, blank, or comment.
 fn parse_statement(input: ParserSpan) -> PResult<Spanned<Statement>> {
     preceded(
         space0,
@@ -121,8 +115,8 @@ fn parse_statement(input: ParserSpan) -> PResult<Spanned<Statement>> {
         .parse(input)
 }
 
+/// Parses a handler statement `[pattern] { block }`.
 fn parse_handler_statement(input: ParserSpan) -> PResult<Spanned<Statement>> {
-    // like `[x _y _{branch} _(x>3)] { ...block... }`
     spanned::spanned(|i| {
         pair(
             delimited(
@@ -130,54 +124,53 @@ fn parse_handler_statement(input: ParserSpan) -> PResult<Spanned<Statement>> {
                 preceded(multispace0, parse_pattern),
                 preceded(multispace0, char(']')),
             ),
-            preceded(space0, parse_block),
+            preceded(space0, parse_block_expr),
         )
-            .map(|(pattern, expr)| {
-                Statement::Handler(Arc::new(Handler {
-                    pattern,
-                    expr,
-                }))
-            })
+            .map(|(pattern, expr)| Statement::Handler(Arc::new(Handler { pattern, expr })))
             .parse(i)
     })
         .parse(input)
 }
 
+/// Parses a pattern list (e.g. `_foo 123 "bar"`).
 fn parse_pattern(input: ParserSpan) -> PResult<Spanned<Pattern>> {
     spanned::spanned(|i| {
         preceded(
             multispace0,
             separated_list0(multispace1, parse_pattern_element),
         )
-            .map(|elements| Pattern::List(elements))
+            .map(Pattern::List)
             .parse(i)
     })
         .parse(input)
 }
 
+/// Parses a single pattern element, which might be `_var`, an integer, string, etc.
 fn parse_pattern_element(input: ParserSpan) -> PResult<Spanned<Pattern>> {
     spanned::spanned(|i| {
         alt((
-            parse_variable_capture.map(|sp_val| Pattern::VariableCapture(sp_val)),
-            parse_block_capture.map(|sp_val| Pattern::BlockCapture(sp_val)),
-            parse_identifier_value.map(|sp_val| Pattern::ValueMatch(sp_val)),
-            parse_number_value.map(|sp_val| Pattern::ValueMatch(sp_val)),
-            parse_string_value.map(|sp_val| Pattern::ValueMatch(sp_val)),
+            parse_variable_capture.map(Pattern::VariableCapture),
+            parse_block_capture.map(Pattern::BlockCapture),
+            parse_identifier_value.map(Pattern::ValueMatch),
+            parse_number_value.map(Pattern::ValueMatch),
+            parse_string_value.map(Pattern::ValueMatch),
         ))
             .parse(i)
     })
         .parse(input)
 }
 
+/// Parses `_abc` as a variable capture.
 fn parse_variable_capture(input: ParserSpan) -> PResult<Spanned<String>> {
     spanned::spanned(|i| {
         preceded(tag("_"), parse_identifier)
-            .map(|sp_val| sp_val)
+            .map(|id| id)
             .parse(i)
     })
         .parse(input)
 }
 
+/// Parses `_{abc}` as a block capture.
 fn parse_block_capture(input: ParserSpan) -> PResult<Spanned<String>> {
     spanned::spanned(|i| {
         delimited(
@@ -185,53 +178,44 @@ fn parse_block_capture(input: ParserSpan) -> PResult<Spanned<String>> {
             parse_identifier,
             preceded(space0, char('}')),
         )
-            .map(|sp_val| sp_val)
+            .map(|id| id)
             .parse(i)
     })
         .parse(input)
 }
 
+/// Parses a `tell` statement, e.g. `xyz alpha+beta something 123`.
+/// It uses a specialized argument parser that does not produce `Ask`.
 fn parse_tell_statement(input: ParserSpan) -> PResult<Spanned<Statement>> {
-    // like `bob something 42 + 3 ok`
     spanned::spanned(|i| {
-        pair(parse_call_target, preceded(space0, parse_call_args))
-            .map(|(target, args)| Statement::Tell {
-                target,
-                value: args,
-            })
+        pair(parse_call_target, preceded(space0, parse_call_args_for_tell))
+            .map(|(target, args)| Statement::Tell { target, value: args })
             .parse(i)
     })
         .parse(input)
 }
 
+/// The "target" portion of a tell statement is usually just a single identifier expression.
 fn parse_call_target(input: ParserSpan) -> PResult<Spanned<Expr>> {
-    spanned::spanned(|i| alt((parse_identifier_value.map(|sp_val| Expr::Value(sp_val)),)).parse(i))
+    spanned::spanned(|i| {
+        parse_identifier_value.map(Expr::Value).parse(i)
+    })
         .parse(input)
 }
 
-fn parse_call_args(input: ParserSpan) -> PResult<Spanned<Expr>> {
-    // like `something 42 + 3 ok` as an Expr::List
+/// Parses the argument list for a tell statement.
+/// We do not want trailing space + subexpressions to become `Ask`, so we call
+/// `parse_expression_no_call` for each argument.
+fn parse_call_args_for_tell(input: ParserSpan) -> PResult<Spanned<Expr>> {
     spanned::spanned(|i| {
-        separated_list1(space0, parse_call_arg)
+        separated_list1(space0, parse_expression_no_call)
             .map(|args| Expr::List { elements: args })
             .parse(i)
     })
         .parse(input)
 }
 
-fn parse_call_arg(input: ParserSpan) -> PResult<Spanned<Expr>> {
-    spanned::spanned(|i| {
-        alt((
-            parse_number_value.map(|sp_val| Expr::Value(sp_val)),
-            parse_string_value.map(|sp_val| Expr::Value(sp_val)),
-            parse_identifier_value.map(|sp_val| Expr::Value(sp_val)),
-        ))
-            .parse(i)
-    })
-        .parse(input)
-}
-
-/// Assignment statement: parse an assignment and return it as a Statement.
+/// Parse an assignment statement of the form `target = expression`.
 fn parse_assignment_statement(input: ParserSpan) -> PResult<Spanned<Statement>> {
     spanned::spanned(|i| {
         pair(
@@ -241,34 +225,24 @@ fn parse_assignment_statement(input: ParserSpan) -> PResult<Spanned<Statement>> 
                 preceded(space0, parse_expression),
             ),
         )
-            .map(|(target, expr)| Statement::Assign {
-                target,
-                value: expr,
-            })
+            .map(|(target, expr)| Statement::Assign { target, value: expr })
             .parse(i)
     })
         .parse(input)
 }
 
-/// Assignment target: parse an identifier and return it as a Value::Word.
+/// Parse the left-hand side of an assignment, either a single variable or a destructuring list.
 fn parse_assignment_target(input: ParserSpan) -> PResult<Spanned<AssignmentTarget>> {
     spanned::spanned(|i| {
-        alt((
-            // Try destructuring first.
-            parse_destructure_target,
-            // Fallback to variable assignment.
-            parse_identifier.map(|sp_val| AssignmentTarget::Variable(sp_val)),
-        ))
-            .parse(i)
+        alt((parse_destructure_target, parse_identifier.map(AssignmentTarget::Variable))).parse(i)
     })
         .parse(input)
 }
 
+/// Parse destructuring brackets `[x y z]`.
 fn parse_destructure_target(input: ParserSpan) -> PResult<AssignmentTarget> {
-    // Recognize a bracketed list of assignment targets.
     delimited(
         char('['),
-        // You might use a combinator that expects one or more assignment targets (separated by whitespace)
         separated_list1(multispace1, parse_assignment_target),
         char(']'),
     )
@@ -276,6 +250,7 @@ fn parse_destructure_target(input: ParserSpan) -> PResult<AssignmentTarget> {
         .parse(input)
 }
 
+/// A test for the assignment parser.
 #[cfg(test)]
 mod assignment_tests {
     use super::*;
@@ -285,27 +260,25 @@ mod assignment_tests {
         let input = "x = 42";
         let mut codemaps = CodeAtlas::new();
         let initial_span = codemaps.add_file(input, None);
-        let result = parse_assignment_statement(initial_span);
 
-        assert!(result.is_ok(), "Failed to parse assignment: {:?}", result);
-
-        let (remaining, assignment) = result.unwrap();
+        let (remaining, stmt) = parse_assignment_statement.parse(initial_span).unwrap();
         assert_eq!(remaining.fragment().to_string(), "");
 
-        if let Statement::Assign { target, value, .. } = *assignment.value {
-            if let AssignmentTarget::Variable(var) = *target.value {
-                assert_eq!(var, "x");
-            } else {
-                panic!("Expected a variable assignment");
-            }
-            if let Expr::Value(ref sp_val) = *value.value {
-                if let Value::Int(i) = *sp_val.value {
-                    assert_eq!(i, 42);
-                } else {
-                    panic!("Expected an integer value");
+        if let Statement::Assign { target, value } = &*stmt.value {
+            // check the variable
+            match &*target.value {
+                AssignmentTarget::Variable(var_name) => {
+                    assert_eq!(var_name, "x");
                 }
-            } else {
-                panic!("Expected a value expression");
+                _ => panic!("Expected a simple variable"),
+            }
+            // check the right side
+            match &*value.value {
+                Expr::Value(sp_val) => match &*sp_val.value {
+                    Value::Int(i) => assert_eq!(*i, 42),
+                    _ => panic!("Expected integer 42"),
+                },
+                _ => panic!("Expected a value expression"),
             }
         } else {
             panic!("Expected an assignment statement");
@@ -313,57 +286,142 @@ mod assignment_tests {
     }
 }
 
-/// Comment line: parse a comment starting with '#' and consume all characters
-/// up to but not including the newline. Preceding whitespace is already handled.
+/// Parse a comment line that begins with `#`, ignoring trailing text up to the newline.
 fn parse_comment_line(input: ParserSpan) -> PResult<Spanned<Statement>> {
     spanned::spanned(|i| {
-        // Expect the comment marker immediately.
-        let (i, _) = tag("#")(i)?;
-        let (i, _) = space0(i)?;
-        // Consume all characters until a newline, without consuming the newline itself.
-        let (i, comment_text) = not_line_ending(i)?;
-        // Create the Comment statement.
-        Ok((i, Statement::Comment(comment_text.fragment().to_string())))
+        let (i, _) = tag("#").parse(i)?;
+        let (i, _) = space0.parse(i)?;
+        let (i, text) = not_line_ending.parse(i)?;
+        Ok((i, Statement::Comment(text.fragment().to_string())))
     })
         .parse(input)
 }
 
-/// Blank line: simply consume the line and return a Statement::BlankLine.
+/// Parse a blank line as `Statement::BlankLine`.
 fn parse_blank_line(input: ParserSpan) -> PResult<Spanned<Statement>> {
     spanned::spanned(|i| {
-        let (i, _) = line_ending(i)?;
+        let (i, _) = line_ending.parse(i)?;
         Ok((i, Statement::BlankLine))
     })
         .parse(input)
 }
 
-/// Expression statement: simply parse an expression and wrap it as a Statement.
+/// Parse an expression statement, wrapping the expression in `Statement::Expr`.
 fn parse_expr_statement(input: ParserSpan) -> PResult<Spanned<Statement>> {
-    spanned::spanned(|i| parse_expression.map(|expr| Statement::Expr(expr)).parse(i)).parse(input)
-}
-
-// --------------------------------------------
-// Expression parsers.
-// --------------------------------------------
-pub fn parse_expression(input: ParserSpan) -> PResult<Spanned<Expr>> {
-    alt((
-        parse_binary_expression,
-        parse_expr_toplevel,
-    ))
+    spanned::spanned(|i| {
+        parse_expression
+            .map(Statement::Expr)
+            .parse(i)
+    })
         .parse(input)
 }
 
-fn parse_parenthesized_expr(input: ParserSpan) -> PResult<Spanned<Expr>> {
-    delimited(
-        char('('),
-        preceded(multispace0, parse_expression),
-        preceded(multispace0, char(')')),
-    )
-        .parse(input)
+// --------------------------------------------------------------------
+// Public expression parser (for normal expressions):
+// This can produce `Ask` if there's a space-suffix with subexpressions.
+// --------------------------------------------------------------------
+
+/// Public expression parser that can produce `Ask` for trailing arguments.
+fn parse_expression(input: ParserSpan) -> PResult<Spanned<Expr>> {
+    parse_binary_expression.parse(input)
 }
 
+/// A specialized expression parser used inside `tell` arguments,
+/// ensuring we never produce an `Ask` node from trailing space + expressions.
+fn parse_expression_no_call(input: ParserSpan) -> PResult<Spanned<Expr>> {
+    parse_binary_expression_no_call.parse(input)
+}
 
-/// A toplevel expression (number or identifier) is wrapped into Expr::Value.
+// --------------------------------------------------------------------
+// "Normal" parse_binary_expression can produce `Ask` from a call suffix.
+// --------------------------------------------------------------------
+
+fn parse_binary_expression(input: ParserSpan) -> PResult<Spanned<Expr>> {
+    let (i, lhs) = parse_precedence_expression(0).parse(input)?;
+    let (i, args_opt) = opt(preceded(space1, separated_list1(space1, parse_precedence_expression(0)))).parse(i)?;
+    if let Some(args) = args_opt {
+        // produce an Ask node
+        let span = Span {
+            file_id: lhs.span.file_id,
+            start: lhs.span.start,
+            end: args.last().unwrap().span.end,
+        };
+        let list_span = Span {
+            file_id: lhs.span.file_id,
+            start: args.first().unwrap().span.start,
+            end: args.last().unwrap().span.end,
+        };
+        Ok((
+            i,
+            Expr::Ask {
+                target: lhs,
+                value: Expr::List { elements: args }.as_spanned(list_span),
+            }
+                .as_spanned(span),
+        ))
+    } else {
+        Ok((i, lhs))
+    }
+}
+
+// --------------------------------------------------------------------
+// "No-call" version that never tries to parse trailing arguments as `Ask`.
+// --------------------------------------------------------------------
+
+fn parse_binary_expression_no_call(input: ParserSpan) -> PResult<Spanned<Expr>> {
+    // We parse precedence-based subexpressions but skip the optional suffix.
+    parse_precedence_expression(0).parse(input)
+}
+
+// --------------------------------------------------------------------
+// Precedence-based subexpression parsing used by both normal and no-call versions.
+// --------------------------------------------------------------------
+
+fn parse_precedence_expression(
+    min_prec: u8,
+) -> impl FnMut(ParserSpan) -> PResult<Spanned<Expr>> {
+    move |mut input| {
+        let (i2, mut lhs) = parse_expr_toplevel.parse(input)?;
+        input = i2;
+
+        loop {
+            // see if next token is an operator of sufficient precedence
+            let op_res = delimited(multispace0, parse_binary_operator, multispace0).parse(input.clone());
+            match op_res {
+                Ok((i3, op)) => {
+                    let prec = op.precedence();
+                    if prec < min_prec {
+                        break;
+                    }
+                    let next_min = match op.associativity() {
+                        Associativity::Left => prec + 1,
+                        Associativity::Right => prec,
+                        Associativity::None => prec,
+                    };
+                    let (i4, rhs) = parse_precedence_expression(next_min).parse(i3)?;
+                    lhs = Expr::BinaryExpr {
+                        lhs: lhs.clone(),
+                        op,
+                        rhs: rhs.clone(),
+                    }
+                        .as_spanned(Span {
+                            file_id: lhs.span.file_id,
+                            start: lhs.span.start,
+                            end: rhs.span.end,
+                        });
+                    input = i4;
+                }
+                Err(_) => break,
+            }
+        }
+        Ok((input, lhs))
+    }
+}
+
+// --------------------------------------------------------------------
+// Toplevel subexpressions: parentheses, blocks, dicts, strings, etc.
+// --------------------------------------------------------------------
+
 fn parse_expr_toplevel(input: ParserSpan) -> PResult<Spanned<Expr>> {
     alt((
         parse_expander_expr,
@@ -371,38 +429,33 @@ fn parse_expr_toplevel(input: ParserSpan) -> PResult<Spanned<Expr>> {
         parse_list_expr,
         parse_block_or_dict,
         parse_string_expr,
-        parse_number_value.map(|sp_val| Spanned::new(sp_val.span.clone(), Expr::Value(sp_val))),
-        parse_identifier_value.map(|sp_val| Spanned::new(sp_val.span.clone(), Expr::Value(sp_val))),
+        map(parse_number_value, |val| {
+            Spanned::new(val.span.clone(), Expr::Value(val))
+        }),
+        map(parse_identifier_value, |val| {
+            Spanned::new(val.span.clone(), Expr::Value(val))
+        }),
     ))
         .parse(input)
 }
 
-/// Parse an expander expression: `*{ a = b }` or `*[1 2 3]`.
+/// Parse an expander expression like `*{ ... }` or `*[ 1 2 ]`.
 fn parse_expander_expr(input: ParserSpan) -> PResult<Spanned<Expr>> {
     spanned::spanned(|i| {
-        preceded(
-            tag("*"),
-            preceded(space0, parse_block_or_dict),
-        )
-            .map(|block| Expr::Expander {
-                target: block,
-            })
+        preceded(tag("*"), preceded(space0, parse_block_or_dict))
+            .map(|block| Expr::Expander { target: block })
             .parse(i)
     })
         .parse(input)
 }
 
-fn parse_string_expr(input: ParserSpan) -> PResult<Spanned<Expr>> {
-    spanned::spanned(|i| {
-        parse_string_value
-            .map(|sp_val| Expr::Value(sp_val))
-            .parse(i)
-    })
+/// Parse a parenthesized expression `( expr )`.
+fn parse_parenthesized_expr(input: ParserSpan) -> PResult<Spanned<Expr>> {
+    delimited(char('('), preceded(multispace0, parse_expression), preceded(multispace0, char(')')))
         .parse(input)
 }
 
-/// Parse a list of expressions separated by whitespace or optional commas.
-/// A list: `[ item1 item2 item3 ]`. Each item is parsed with `parse_expr_no_call`
+/// Parse a list expression `[ expr1 expr2 ]`.
 fn parse_list_expr(input: ParserSpan) -> PResult<Spanned<Expr>> {
     spanned::spanned(|i| {
         delimited(
@@ -415,7 +468,7 @@ fn parse_list_expr(input: ParserSpan) -> PResult<Spanned<Expr>> {
                 ),
             ),
             preceded(
-                preceded(multispace0, opt((tag(","), multispace0))),
+                preceded(multispace0, opt(pair(tag(","), multispace0))),
                 char(']'),
             ),
         )
@@ -425,100 +478,17 @@ fn parse_list_expr(input: ParserSpan) -> PResult<Spanned<Expr>> {
         .parse(input)
 }
 
-/// Minimal binary expression: `expr operator expr`.
-/// The overall span of the binary expression is the range from the start of the left
-/// sub-expression to the end of the right sub-expression.
-fn parse_binary_expression(input: ParserSpan) -> PResult<Spanned<Expr>> {
-    // 1) parse operator expression
-    let (i, expr) = parse_precedence_expression(0).parse(input)?;
-    // 2) parse optional "call suffix"
-    let (i, args_opt) = opt(preceded(
-        space1,
-        separated_list1(space1, parse_precedence_expression(0)),
-    ))
-        .parse(i)?;
-    if let Some(args) = args_opt {
-        // We have a call with multiple arguments
-        let span = Span {
-            file_id: expr.span.file_id,
-            start: expr.span.start,
-            end: args.last().unwrap().span.end,
-        };
-        let args_span = Span {
-            file_id: expr.span.file_id,
-            start: args.first().unwrap().span.start,
-            end: args.last().unwrap().span.end,
-        };
-        Ok((
-            i,
-            Expr::Ask {
-                target: expr,
-                value: Expr::List {
-                    elements: args,
-                }.as_spanned(args_span),
-            }.as_spanned(span)
-        ))
-    } else {
-        Ok((i, expr))
-    }
-}
-
-fn parse_precedence_expression(min_prec: u8) -> impl Fn(ParserSpan) -> PResult<Spanned<Expr>> {
-    move |i: ParserSpan| {
-        // parse a "primary"
-        let (mut i2, mut lhs) = parse_expr_toplevel(i)?;
-        // loop while next operator has prec >= min_prec
-        loop {
-            let op_res = delimited(
-                multispace0,
-                parse_binary_operator,
-                multispace0,
-            ).parse(i2.clone());
-            match op_res {
-                Ok((i3, op)) => {
-                    let prec = op.precedence();
-                    if prec < min_prec {
-                        break;
-                    }
-                    let next_min = match op.associativity() {
-                        Associativity::Left => prec + 1,
-                        Associativity::Right => prec,
-                        Associativity::None => prec,
-                    };
-                    let (i4, rhs) = parse_precedence_expression(next_min)(i3)?;
-                    lhs = Expr::BinaryExpr {
-                        lhs: lhs.clone(),
-                        op,
-                        rhs: rhs.clone(),
-                    }.as_spanned(
-                        Span {
-                            file_id: lhs.span.file_id,
-                            start: lhs.span.start,
-                            end: rhs.span.end,
-                        }
-                    );
-                    i2 = i4;
-                }
-                Err(_) => break,
-            }
-        }
-        Ok((i2, lhs))
-    }
-}
-
-// --------------------------------------------
-// Block or dictionary expression: parse a block of statements or a dictionary.
-
-/// Distinguish a `{ block }` vs. `{ dict }` by checking for colon usage, etc.
+/// Parse either a block `{ statements }` or a dictionary `{ key: val, ... }`.
 fn parse_block_or_dict(input: ParserSpan) -> PResult<Spanned<Expr>> {
-    alt((parse_dict_expr, parse_block)).parse(input)
+    alt((parse_dict_expr, parse_block_expr)).parse(input)
 }
 
-/// A `{ ... }` block is a list of statements in braces.
-fn parse_block(input: ParserSpan) -> PResult<Spanned<Expr>> {
-    spanned::spanned(|i| parse_block_value.map(|block| Expr::Value(block)).parse(i)).parse(input)
+/// Parse a block expression `{ ... }` as `Expr::Value(Value::Block(...))`.
+fn parse_block_expr(input: ParserSpan) -> PResult<Spanned<Expr>> {
+    spanned::spanned(|i| parse_block_value.map(Expr::Value).parse(i)).parse(input)
 }
 
+/// Parse the interior of a block into a `Value::Block`.
 fn parse_block_value(input: ParserSpan) -> PResult<Spanned<Value>> {
     spanned::spanned(|i| {
         delimited(
@@ -526,12 +496,13 @@ fn parse_block_value(input: ParserSpan) -> PResult<Spanned<Value>> {
             delimited(multispace0, parse_statements, multispace0),
             char('}'),
         )
-            .map(|block| Value::Block(Arc::new(Block(block))))
+            .map(|stmts| Value::Block(Arc::new(Block(stmts))))
             .parse(i)
     })
         .parse(input)
 }
 
+/// Parse a dictionary expression `{ k: v, ... }`.
 fn parse_dict_expr(input: ParserSpan) -> PResult<Spanned<Expr>> {
     spanned::spanned(|i| {
         delimited(
@@ -545,18 +516,19 @@ fn parse_dict_expr(input: ParserSpan) -> PResult<Spanned<Expr>> {
                 preceded(multispace0, char('}')),
             ),
         )
-            .map(|entries| {
-                let mut index_map = indexmap::IndexMap::new();
-                for (entry, value) in entries {
-                    index_map.insert(entry, value);
+            .map(|pairs| {
+                let mut map = indexmap::IndexMap::new();
+                for (k, v) in pairs {
+                    map.insert(k, v);
                 }
-                Expr::Dict { index_map }
+                Expr::Dict { index_map: map }
             })
             .parse(i)
     })
         .parse(input)
 }
 
+/// Parse a single dict entry `key: expression`.
 fn parse_dict_entry(input: ParserSpan) -> PResult<(String, Spanned<Expr>)> {
     pair(
         parse_identifier,
@@ -568,10 +540,12 @@ fn parse_dict_entry(input: ParserSpan) -> PResult<(String, Spanned<Expr>)> {
         .parse(input)
 }
 
-// --------------------------------------------
-// Binary operator parser.
-// No leading space is consumed; spacing is managed externally.
-// --------------------------------------------
+/// Parse a string expression into `Expr::Value(Value::Str(...))`.
+fn parse_string_expr(input: ParserSpan) -> PResult<Spanned<Expr>> {
+    spanned::spanned(|i| parse_string_value.map(Expr::Value).parse(i)).parse(input)
+}
+
+/// Parse a binary operator token (`+`, `-`, `*`, etc.).
 fn parse_binary_operator(input: ParserSpan) -> IResult<ParserSpan, Spanned<Operator>, ParseError> {
     spanned::spanned(|i| {
         alt((
@@ -590,13 +564,10 @@ fn parse_binary_operator(input: ParserSpan) -> IResult<ParserSpan, Spanned<Opera
         .parse(input)
 }
 
-// --------------------------------------------
-// Number and Identifier parsers.
-// They return Spanned<Value> which we later wrap into an Expr.
-// --------------------------------------------
+/// Parse a numeric literal into `Value::Int`.
 fn parse_number_value(input: ParserSpan) -> IResult<ParserSpan, Spanned<Value>, ParseError> {
     spanned::spanned(|i| {
-        let (i, digits) = parse_digit1(i)?;
+        let (i, digits) = parse_digit1.parse(i)?;
         let s = digits.fragment();
         let val_i64 = s.parse::<i64>().map_err(|e| {
             NomErr::Error(ParseError::InvalidNumber {
@@ -610,174 +581,150 @@ fn parse_number_value(input: ParserSpan) -> IResult<ParserSpan, Spanned<Value>, 
         .parse(input)
 }
 
+/// Parse an identifier (alpha or `_` followed by alphanumerics, `_`, or `-`).
 fn parse_identifier(input: ParserSpan) -> IResult<ParserSpan, String, ParseError> {
-    // an alpha or underscore followed by alphanum or underscore or hyphen
     (alpha1, many0(alt((alpha1, parse_tag("_"), parse_tag("-")))))
-        .map(|(first, rest): (ParserSpan, Vec<ParserSpan>)| {
-            let mut id = first.fragment().to_string();
-            for s in rest {
-                id.push_str(s.fragment());
+        .map(|(fst, rest): (ParserSpan, Vec<ParserSpan>)| {
+            let mut out = fst.fragment().to_string();
+            for chunk in rest {
+                out.push_str(chunk.fragment());
             }
-            id
+            out
         })
         .parse(input)
 }
 
+/// Wrap an identifier string in `Value::Word`.
 fn parse_identifier_value(input: ParserSpan) -> IResult<ParserSpan, Spanned<Value>, ParseError> {
-    spanned::spanned(|i| parse_identifier.map(|s: String| Value::Word(s)).parse(i)).parse(input)
+    spanned::spanned(|i| parse_identifier.map(Value::Word).parse(i)).parse(input)
 }
 
 #[cfg(test)]
 pub mod parser_tests {
-    // tests/parser_tests.rs
     use super::*;
 
-    /// Helper: Given the source code as a &str, create a new CodeMaps and parse a file.
+    /// A helper function that parses the entire input using `parse_file_complete`,
+    /// returning the vector of statements in the top-level block.
     fn parse_complete(source: &str) -> Result<Vec<Spanned<Statement>>, ParseError> {
         let mut codemaps = CodeAtlas::new();
         parse_file_complete(&mut codemaps, source, None).map(|top| match top {
-            TopLevel::Block(block) => block.0,
+            TopLevel::Block(b) => b.0,
             _ => vec![],
         })
     }
 
     #[test]
     fn test_parse_integer() {
-        // A simple integer literal.
         let input = "42";
-        let stmts = parse_complete(input).expect("should parse integer");
+        let stmts = parse_complete(input).expect("should parse integer literal");
         assert_eq!(stmts.len(), 1);
 
-        // The statement should be an expression wrapping a value.
-        let stmt = &stmts[0];
-        if let Statement::Expr(ref expr) = *stmt.value {
-            if let Expr::Value(sp_val) = &**expr {
-                if let Value::Int(i) = *sp_val.value {
-                    assert_eq!(i, 42);
-                } else {
-                    panic!("Expected an integer literal");
-                }
-            } else {
-                panic!("Expected a value expression");
-            }
-        } else {
-            panic!("Expected an expression statement");
+        match &*stmts[0].value {
+            Statement::Expr(expr) => match &**expr {
+                Expr::Value(sp_val) => match &*sp_val.value {
+                    Value::Int(i) => assert_eq!(*i, 42),
+                    _ => panic!("Expected int 42"),
+                },
+                _ => panic!("Expected Expr::Value"),
+            },
+            _ => panic!("Expected a single expression statement"),
         }
 
-        // Check that the span recovered from input matches the expected substring.
-        let span_text = &input[stmt.span.start..stmt.span.end];
+        // verify that the spanned text matches "42"
+        let span_text = &input[stmts[0].span.start..stmts[0].span.end];
         assert_eq!(span_text, "42");
     }
 
     #[test]
     fn test_parse_identifier() {
-        // Test a simple identifier.
         let input = "fooBar";
         let stmts = parse_complete(input).expect("should parse identifier");
         assert_eq!(stmts.len(), 1);
 
-        let stmt = &stmts[0];
-        if let Statement::Expr(ref expr) = *stmt.value {
-            if let Expr::Value(sp_val) = &**expr {
-                if let Value::Word(ref word) = *sp_val.value {
-                    assert_eq!(word, "fooBar");
-                } else {
-                    panic!("Expected an identifier word");
-                }
-            } else {
-                panic!("Expected a value expression");
-            }
-        } else {
-            panic!("Expected an expression statement got {:?}", *stmt);
+        match &*stmts[0].value {
+            Statement::Expr(expr) => match &**expr {
+                Expr::Value(sp_val) => match &*sp_val.value {
+                    Value::Word(w) => assert_eq!(w, "fooBar"),
+                    _ => panic!("Expected Word(fooBar)"),
+                },
+                _ => panic!("Expected Expr::Value for identifier"),
+            },
+            _ => panic!("Expected an expression statement for identifier"),
         }
 
-        // Check span text.
-        let span_text = &input[stmt.span.start..stmt.span.end];
+        let span_text = &input[stmts[0].span.start..stmts[0].span.end];
         assert_eq!(span_text, "fooBar");
     }
 
     #[test]
     fn test_parse_addition() {
-        // Test binary expression: addition.
+        // "1+2" => an expression statement with a binary expression.
         let input = "1+2";
-        let stmts = parse_complete(input).expect("should parse binary addition");
+        let stmts = parse_complete(input).expect("should parse addition");
         assert_eq!(stmts.len(), 1);
-        let stmt = &stmts[0];
 
-        // The outer statement should be a binary expression.
-        if let Statement::Expr(ref expr) = *stmt.value {
-            if let Expr::BinaryExpr { lhs, op, rhs } = &**expr {
-                // lhs should be "1"
-                if let Expr::Value(ref sp_val) = *lhs.value {
-                    if let Value::Int(i1) = *sp_val.value {
-                        assert_eq!(i1, 1);
+        let stmt = &stmts[0];
+        if let Statement::Expr(e) = &*stmt.value {
+            if let Expr::BinaryExpr { lhs, op, rhs } = &**e {
+                if let Expr::Value(lhs_val) = &*lhs.value {
+                    if let Value::Int(i) = *lhs_val.value {
+                        assert_eq!(i, 1);
                     } else {
-                        panic!("Left operand is not an integer");
+                        panic!("Left operand not int=1");
                     }
                 } else {
-                    panic!("Left operand is not a value expression");
+                    panic!("Left operand not Expr::Value");
                 }
-                // op should be Add.
                 assert_eq!(*op.value, Operator::Add);
-                // rhs should be "2"
-                if let Expr::Value(ref sp_val) = *rhs.value {
-                    if let Value::Int(i2) = *sp_val.value {
-                        assert_eq!(i2, 2);
+                if let Expr::Value(rhs_val) = &*rhs.value {
+                    if let Value::Int(i) = *rhs_val.value {
+                        assert_eq!(i, 2);
                     } else {
-                        panic!("Right operand is not an integer");
+                        panic!("Right operand not int=2");
                     }
                 } else {
-                    panic!("Right operand is not a value expression");
+                    panic!("Right operand not Expr::Value");
                 }
-                // Verify overall span recovers the full binary expression.
-                let span_text = &input[stmt.span.start..stmt.span.end];
-                assert_eq!(span_text, "1+2");
             } else {
-                panic!("Expected a binary expression");
+                panic!("Expected a BinaryExpr");
             }
         } else {
             panic!("Expected an expression statement");
         }
+
+        let span_text = &input[stmt.span.start..stmt.span.end];
+        assert_eq!(span_text, "1+2");
     }
 
     #[test]
     fn test_parse_binary_expression_with_whitespace() {
-        // Test binary expression with extra spaces.
-        let input = "  10   -  5  ";
-        let stmts = parse_complete(input).expect("should parse binary expression with whitespace");
+        let input = "   10  -  5 ";
+        let stmts = parse_complete(input).expect("should parse 10-5");
         assert_eq!(stmts.len(), 1);
-        let stmt = &stmts[0];
 
-        if let Statement::Expr(ref expr) = *stmt.value {
-            if let Expr::BinaryExpr { lhs, op, rhs } = &**expr {
-                // Check left operand: 10.
-                if let Expr::Value(ref sp_val) = *lhs.value {
-                    if let Value::Int(i1) = *sp_val.value {
-                        assert_eq!(i1, 10);
+        if let Statement::Expr(e) = &*stmts[0].value {
+            if let Expr::BinaryExpr { lhs, op, rhs } = &**e {
+                if let Expr::Value(lhs_val) = &*lhs.value {
+                    if let Value::Int(n) = *lhs_val.value {
+                        assert_eq!(n, 10);
                     } else {
-                        panic!("Left operand not integer");
+                        panic!("Left operand not int=10");
                     }
                 } else {
-                    panic!("Left operand not a value expression");
+                    panic!("Left operand not Expr::Value");
                 }
-                // Operator should be Subtract.
                 assert_eq!(*op.value, Operator::Subtract);
-                // Right operand: 5.
-                if let Expr::Value(ref sp_val) = *rhs.value {
-                    if let Value::Int(i2) = *sp_val.value {
-                        assert_eq!(i2, 5);
+                if let Expr::Value(rhs_val) = &*rhs.value {
+                    if let Value::Int(n) = *rhs_val.value {
+                        assert_eq!(n, 5);
                     } else {
-                        panic!("Right operand not integer");
+                        panic!("Right operand not int=5");
                     }
                 } else {
-                    panic!("Right operand not a value expression");
+                    panic!("Right operand not Expr::Value");
                 }
-                // Check recovered span.
-                // The parser's delimited combinators trim the outer whitespace.
-                let span_text = &input[stmt.span.start..stmt.span.end];
-                assert_eq!(span_text, "10   -  5");
             } else {
-                panic!("Expected a binary expression");
+                panic!("Expected a BinaryExpr");
             }
         } else {
             panic!("Expected an expression statement");
@@ -786,77 +733,61 @@ pub mod parser_tests {
 
     #[test]
     fn test_parse_equality_operator() {
-        // Test binary expression with the equality operator.
         let input = "7==8";
-        let stmts = parse_complete(input).expect("should parse equality binary expression");
+        let stmts = parse_complete(input).expect("should parse 7==8");
         assert_eq!(stmts.len(), 1);
-        let stmt = &stmts[0];
 
-        if let Statement::Expr(ref expr) = *stmt.value {
-            if let Expr::BinaryExpr { lhs, op, rhs } = &**expr {
-                // Left side should be 7.
-                if let Expr::Value(ref sp_val) = *lhs.value {
-                    if let Value::Int(i) = *sp_val.value {
-                        assert_eq!(i, 7);
+        if let Statement::Expr(e) = &*stmts[0].value {
+            if let Expr::BinaryExpr { lhs, op, rhs } = &**e {
+                if let Expr::Value(lhs_val) = &*lhs.value {
+                    if let Value::Int(n) = *lhs_val.value {
+                        assert_eq!(n, 7);
                     } else {
-                        panic!("Left side is not integer");
+                        panic!("Left side not int=7");
                     }
                 } else {
-                    panic!("Left side not a value expression");
+                    panic!("Left side not Expr::Value");
                 }
-                // Operator should be Equal.
                 assert_eq!(*op.value, Operator::Equal);
-                // Right side should be 8.
-                if let Expr::Value(ref sp_val) = *rhs.value {
-                    if let Value::Int(i) = *sp_val.value {
-                        assert_eq!(i, 8);
+                if let Expr::Value(rhs_val) = &*rhs.value {
+                    if let Value::Int(n) = *rhs_val.value {
+                        assert_eq!(n, 8);
                     } else {
-                        panic!("Right side is not integer");
+                        panic!("Right side not int=8");
                     }
                 } else {
-                    panic!("Right side not a value expression");
+                    panic!("Right side not Expr::Value");
                 }
-                let span_text = &input[stmt.span.start..stmt.span.end];
-                assert_eq!(span_text, "7==8");
             } else {
-                panic!("Expected a binary expression");
+                panic!("Expected a BinaryExpr");
             }
         } else {
-            panic!("Expected an expression statement");
+            panic!("Expected expression statement");
         }
     }
 
     #[test]
     fn test_incomplete_error() {
-        // Test that extra (unparsed) input yields an Incomplete error.
         let input = "123 = /";
         let result = parse_complete(input);
         assert!(result.is_err());
-
-        if let Err(err) = result {
-            match err {
-                ParseError::Incomplete { remaining, .. } => {
-                    // The parser should stop at the " extra" part.
-                    // Note that multispace at beginning of the leftover may be trimmed.
-                    assert_eq!(remaining.trim(), "= /");
-                }
-                _ => panic!("Expected an Incomplete error variant"),
+        match result {
+            Err(ParseError::Incomplete { remaining, .. }) => {
+                assert_eq!(remaining.trim(), "= /");
             }
+            _ => panic!("Expected an Incomplete error variant"),
         }
     }
 
-    /// This test verifies that the spanned helper correctly tracks source regions in a realistic scenario.
+    /// Verifies that the parser's spanned helper includes only the text for the expression.
     #[test]
     fn test_spanned_text_recovery() {
-        // Input with leading whitespace that is trimmed by the outer combinator.
         let input = "   789";
-        let stmts = parse_complete(input).expect("should parse spanned expression");
-        // The only statement should represent the number 789.
+        let stmts = parse_complete(input).expect("should parse integer 789");
         assert_eq!(stmts.len(), 1);
-        let stmt = &stmts[0];
-        // Because the delimited combinator in parse_statements consumes leading/trailing spaces,
-        // the span of the statement should only include "789" (from the original input).
-        let recovered_text = &input[stmt.span.start..stmt.span.end];
-        assert_eq!(recovered_text, "789");
+
+        let stmt_span = &stmts[0].span;
+        let snippet = &input[stmt_span.start..stmt_span.end];
+        assert_eq!(snippet, "789");
     }
 }
