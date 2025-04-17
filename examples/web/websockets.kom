@@ -1,0 +1,65 @@
+WsHandler = {
+	server = null
+	socket = null
+
+	[ws _socket connected] {
+		socket = socket
+	}
+
+	[ws _socket message _msg] {
+		Io println msg
+		server broadcast self msg
+	}
+
+	[send _msg] {
+    	Io println msg
+    	socket send msg
+    }
+}
+
+Server = {
+	clients = []
+	history = []
+	listener = null
+	host = "localhost"
+	port = 8080
+
+	[start] {
+		listener = spawn HttpListener {
+        	host: host,
+        	port: port,
+        	delegate: me
+        }
+        Io println "Server started on http://" + host + ":" + port
+	}
+
+	[http _request _response GET] {
+        response template "examples/web/templates/chat.html" {
+          title: "Komrad"
+        }
+	}
+
+	[ws _socket connect] {
+		client = spawn WsHandler {
+			server: me
+		}
+		clients = clients + [client]
+		socket set-delegate client
+		Io println "WebSocket connected"
+		history foreach m {
+			socket send m
+		}
+	}
+
+	[broadcast _sender _message] {
+		clients foreach x {
+			x send message
+		}
+		history = history + [message]
+	}
+}
+
+server = spawn Server {
+	host: "0.0.0.0",
+	port: 8086
+}
