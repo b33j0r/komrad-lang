@@ -37,6 +37,28 @@ pub enum Value {
     Bytes(Arc<bytes::Bytes>),
 }
 
+impl Value {
+    pub fn is_null(&self) -> bool {
+        matches!(self, Value::Null)
+    }
+
+    pub fn is_error(&self) -> bool {
+        matches!(self, Value::Error(_)) || matches!(self, Value::RemoteError(_))
+    }
+
+    pub fn is_word(&self) -> bool {
+        matches!(self, Value::Word(_))
+    }
+
+    pub fn is_list(&self) -> bool {
+        matches!(self, Value::List(_))
+    }
+
+    pub fn is_dict(&self) -> bool {
+        matches!(self, Value::Dict(_))
+    }
+}
+
 impl From<&Value> for JsonValue {
     fn from(v: &Value) -> JsonValue {
         match v {

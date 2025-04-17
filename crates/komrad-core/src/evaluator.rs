@@ -5,7 +5,7 @@ use crate::dict::Dict;
 use crate::env::Env;
 use crate::error::RuntimeError;
 use crate::value::Value;
-use crate::{AsSpanned, Channel, Message, MessageHandler, ToSExpr};
+use crate::{AsSpanned, Block, Channel, Message, MessageHandler, ToSExpr};
 use async_trait::async_trait;
 use indexmap::IndexMap;
 use std::future::Future;
@@ -20,6 +20,24 @@ pub trait Evaluate {
 
     /// Evaluates the given AST node into a `Value`.
     async fn evaluate(&self, env: &mut Env) -> Value;
+}
+
+#[async_trait]
+impl Evaluate for Block {
+    type Input = Self;
+    type Output = Value;
+
+    async fn evaluate(&self, env: &mut Env) -> Value {
+        let mut result = Value::Null;
+        for stmt in &self.0 {
+            result = stmt.evaluate(env).await;
+            if result.is_error() {
+                error!("Error in block: {:?}", result);
+                break;
+            }
+        }
+        result
+    }
 }
 
 #[async_trait]
@@ -267,11 +285,7 @@ impl Evaluate for Spanned<Expr> {
                 let targ = target.evaluate(env).await;
                 match targ {
                     Value::Block(b) => {
-                        let mut result = Value::Null;
-                        for stmt in &b.0 {
-                            result = stmt.evaluate(env).await;
-                        }
-                        result
+                        b.evaluate(env).await
                     }
                     _ => Value::Error(
                         RuntimeError::ArgumentError("Target is not a block".to_string())
@@ -324,7 +338,7 @@ impl Evaluate for Spanned<Statement> {
                         Ok(_) => Value::Null,
                         Err(e) => Value::Error(e.as_spanned(value.span.clone())),
                     },
-                    // TODO: merge with the `ask` expression
+                    // TODO: merge with the `ask` expression?
                     Value::Dict(mut dict) => {
                         let msg = Message::new(val, None);
                         match dict.on_message(&msg).await {
@@ -337,7 +351,7 @@ impl Evaluate for Spanned<Statement> {
                             }
                         }
                     }
-                    // TODO: merge with the `ask` expression
+                    // TODO: merge with the `ask` expression?
                     Value::List(mut vs) => {
                         let msg = Message::new(val, None);
                         match vs.on_message(&msg).await {
@@ -360,11 +374,7 @@ impl Evaluate for Spanned<Statement> {
                 let targ = target.evaluate(env).await;
                 match targ {
                     Value::Block(b) => {
-                        let mut result = Value::Null;
-                        for stmt in &b.0 {
-                            result = stmt.evaluate(env).await;
-                        }
-                        result
+                        b.evaluate(env).await
                     }
                     _ => Value::Error(
                         RuntimeError::ArgumentError("Target is not a block".to_string())

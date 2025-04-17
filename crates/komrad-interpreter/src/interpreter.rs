@@ -3,11 +3,12 @@ use crate::agents::fs_agent::FsAgent;
 use crate::agents::io_agent::IoAgent;
 use crate::agents::log_agent::LogAgent;
 use crate::spawn_agent::SpawnAgent;
-use komrad_core::{Agent, AgentFactory, RuntimeError};
+use komrad_core::{Agent, AgentFactory, ParseError, RuntimeError};
 use komrad_core::{CodeAtlas, Env, Evaluate, Spanned, Statement, TopLevel, Value};
 use komrad_parser::parse_toplevel::parse_file_complete;
 use komrad_web::HttpListenerFactory;
 use std::collections::HashMap;
+use std::fmt::Display;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
 
@@ -16,7 +17,10 @@ pub type InterpreterResult<T> = Result<T, InterpreterError>;
 #[derive(Debug, Error)]
 pub enum InterpreterError {
     #[error("Runtime error: {0}")]
-    RuntimeError(#[from] RuntimeError),
+    RuntimeError(#[from] Spanned<RuntimeError>),
+
+    #[error("Parse error: {0}")]
+    ParseError(#[from] ParseError),
 
     #[error("File not found: {0}")]
     FileNotFound(String),
@@ -79,14 +83,9 @@ impl Interpreter {
     pub async fn run_top_level(&mut self, top_level: TopLevel) -> InterpreterResult<Value> {
         match top_level {
             TopLevel::Block(block) => {
-                let mut result = Value::Null;
-                for statement in block.0 {
-                    match self.run_statement(statement).await {
-                        Ok(value) => result = value,
-                        Err(e) => {
-                            return Err(e);
-                        }
-                    }
+                let result = block.evaluate(&mut self.env).await;
+                if let Value::Error(error) = result {
+                    return Err(InterpreterError::RuntimeError(error));
                 }
                 Ok(result)
             }
@@ -102,7 +101,7 @@ impl Interpreter {
         let toplevel = parse_file_complete(&mut self.codemaps, &code, Some(PathBuf::from(file_path)));
         match toplevel {
             Ok(toplevel) => self.run_top_level(toplevel).await,
-            Err(e) => Err(InterpreterError::RuntimeError(RuntimeError::ParseError(e))),
+            Err(e) => Err(InterpreterError::ParseError(e)),
         }
     }
 }

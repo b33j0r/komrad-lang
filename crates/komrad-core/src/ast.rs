@@ -1,8 +1,11 @@
 use crate::value::Value;
+use crate::RuntimeError;
 use indexmap::IndexMap;
 use nom::error::{FromExternalError, ParseError as NomParseError};
+use std::fmt::Display;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
+
 pub enum TopLevel {
     Statement(Spanned<Statement>),
     Block(Block),
@@ -40,6 +43,12 @@ impl<T> Spanned<T> {
             span,
             value: Box::new(value),
         }
+    }
+}
+
+impl Display for Spanned<RuntimeError> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.value)
     }
 }
 

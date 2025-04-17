@@ -43,15 +43,7 @@ impl AgentLifecycle for DynamicAgent {
         // Typically, the block is a series of statements that define
         // patterns, variables, or do side effects.
 
-        let mut initializer_result = Value::Null;
-        for stmt in &self.block.0 {
-            initializer_result = stmt.evaluate(&mut self.env).await;
-            debug!(
-                "DynamicAgent block stmt: {:?} => {:?}",
-                stmt.to_sexpr(),
-                initializer_result.to_sexpr()
-            );
-        }
+        let initializer_result = self.block.evaluate(&mut self.env).await;
         debug!(
             "DynamicAgent block result: {:?}",
             initializer_result.to_sexpr()
@@ -129,15 +121,7 @@ impl MessageHandler for DynamicAgent {
                                 // For block we actually have to evaluate the statements
                                 Value::Block(block) => {
                                     // Evaluate the block in the handler's environment
-                                    let mut result = Value::Null;
-                                    for stmt in &block.0 {
-                                        result = stmt.evaluate(&mut child_env).await;
-                                        trace!(
-                                            "Handler block stmt: {:?} => {:?}",
-                                            stmt.to_sexpr(),
-                                            result.to_sexpr()
-                                        );
-                                    }
+                                    let result = block.evaluate(&mut child_env).await;
                                     return Some(result);
                                 }
                                 _ => {
