@@ -12,6 +12,7 @@ mod sexpr;
 mod value;
 mod error;
 mod dict;
+mod list;
 
 pub use agent::*;
 pub use ast::*;

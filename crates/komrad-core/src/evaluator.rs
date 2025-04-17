@@ -221,6 +221,20 @@ impl Evaluate for Spanned<Expr> {
                             }
                         }
                     }
+                    Value::List(mut vs) => {
+                        let msg = Message::new(val, None);
+                        match vs.on_message(&msg).await {
+                            Some(reply) => {
+                                reply
+                            }
+                            None => {
+                                Value::Error(
+                                    RuntimeError::ArgumentError("No handler found".to_string())
+                                        .as_spanned(value.span.clone()),
+                                )
+                            }
+                        }
+                    }
                     _ => Value::Error(
                         RuntimeError::ArgumentError("Target is not a channel".to_string())
                             .as_spanned(target.span.clone()),
@@ -310,9 +324,23 @@ impl Evaluate for Spanned<Statement> {
                         Ok(_) => Value::Null,
                         Err(e) => Value::Error(e.as_spanned(value.span.clone())),
                     },
+                    // TODO: merge with the `ask` expression
                     Value::Dict(mut dict) => {
                         let msg = Message::new(val, None);
                         match dict.on_message(&msg).await {
+                            Some(reply) => reply,
+                            None => {
+                                Value::Error(
+                                    RuntimeError::ArgumentError("No handler found".to_string())
+                                        .as_spanned(value.span.clone()),
+                                )
+                            }
+                        }
+                    }
+                    // TODO: merge with the `ask` expression
+                    Value::List(mut vs) => {
+                        let msg = Message::new(val, None);
+                        match vs.on_message(&msg).await {
                             Some(reply) => reply,
                             None => {
                                 Value::Error(
