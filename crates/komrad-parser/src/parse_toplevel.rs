@@ -440,7 +440,7 @@ fn parse_expr_toplevel(input: ParserSpan) -> PResult<Spanned<Expr>> {
 /// Parse an expander expression like `*{ ... }` or `*[ 1 2 ]`.
 fn parse_expander_expr(input: ParserSpan) -> PResult<Spanned<Expr>> {
     spanned::spanned(|i| {
-        preceded(tag("*"), preceded(space0, alt((parse_block_or_dict, parse_list_expr))))
+        preceded(tag("*"), preceded(space0, alt((parse_block_or_dict, parse_list_expr, parse_identifier_expr))))
             .map(|block| Expr::Expander { target: block })
             .parse(i)
     })
@@ -596,6 +596,11 @@ fn parse_identifier(input: ParserSpan) -> IResult<ParserSpan, String, ParseError
 /// Wrap an identifier string in `Value::Word`.
 fn parse_identifier_value(input: ParserSpan) -> IResult<ParserSpan, Spanned<Value>, ParseError> {
     spanned::spanned(|i| parse_identifier.map(Value::Word).parse(i)).parse(input)
+}
+
+/// Parse an identifier into a spanned expression.
+fn parse_identifier_expr(input: ParserSpan) -> IResult<ParserSpan, Spanned<Expr>, ParseError> {
+    spanned::spanned(|i| parse_identifier_value.map(Expr::Value).parse(i)).parse(input)
 }
 
 #[cfg(test)]
