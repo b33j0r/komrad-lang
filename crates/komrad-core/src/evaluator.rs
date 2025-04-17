@@ -10,7 +10,12 @@ use async_trait::async_trait;
 use indexmap::IndexMap;
 use std::future::Future;
 use std::pin::Pin;
-use tracing::{debug, error, trace};
+use tracing::{debug, trace};
+
+#[async_trait]
+pub trait InternalMessageHandler {
+    async fn on_internal_message(&mut self, env: &mut Env, message: &Message) -> Option<Value>;
+}
 
 /// A trait specifying how to evaluate an AST node into a `Value`.
 #[async_trait]
@@ -227,7 +232,7 @@ impl Evaluate for Spanned<Expr> {
                     },
                     Value::Dict(mut dict) => {
                         let msg = Message::new(val, None);
-                        match dict.on_message(&msg).await {
+                        match dict.on_internal_message(env, &msg).await {
                             Some(reply) => {
                                 reply
                             }
@@ -241,7 +246,7 @@ impl Evaluate for Spanned<Expr> {
                     }
                     Value::List(mut vs) => {
                         let msg = Message::new(val, None);
-                        match vs.on_message(&msg).await {
+                        match vs.on_internal_message(env, &msg).await {
                             Some(reply) => {
                                 reply
                             }
@@ -341,7 +346,7 @@ impl Evaluate for Spanned<Statement> {
                     // TODO: merge with the `ask` expression?
                     Value::Dict(mut dict) => {
                         let msg = Message::new(val, None);
-                        match dict.on_message(&msg).await {
+                        match dict.on_internal_message(env, &msg).await {
                             Some(reply) => reply,
                             None => {
                                 Value::Error(
@@ -354,7 +359,7 @@ impl Evaluate for Spanned<Statement> {
                     // TODO: merge with the `ask` expression?
                     Value::List(mut vs) => {
                         let msg = Message::new(val, None);
-                        match vs.on_message(&msg).await {
+                        match vs.on_internal_message(env, &msg).await {
                             Some(reply) => reply,
                             None => {
                                 Value::Error(

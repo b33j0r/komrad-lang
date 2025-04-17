@@ -1,4 +1,4 @@
-use crate::{Message, MessageHandler, Value};
+use crate::{Env, Evaluate, InternalMessageHandler, Message, MessageHandler, Value};
 use async_trait::async_trait;
 use indexmap::IndexMap;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -10,8 +10,8 @@ pub struct Dict {
 }
 
 #[async_trait]
-impl MessageHandler for Dict {
-    async fn on_message(&mut self, message: &Message) -> Option<Value> {
+impl InternalMessageHandler for Dict {
+    async fn on_internal_message(&mut self, env: &mut Env, message: &Message) -> Option<Value> {
         // We expect the message to be a Value::List of terms, e.g. [ Word("len") ]
         let terms_val = message.value();
 
@@ -28,6 +28,16 @@ impl MessageHandler for Dict {
                 match terms.as_slice() {
                     // e.g. [ Word("len") ]
                     [Value::Word(w)] if w.as_str() == "len" => Some(Value::Int(self.index_map.len() as i64)),
+                    // e.g. [ Word("foreach"), Word("x"), Block(b) ]
+                    [Value::Word(w), Value::Word(var), Value::Block(b)] if w.as_str() == "foreach" => {
+                        // iter keys as var, value not included
+                        for item in self.index_map.keys() {
+                            let mut env = env.clone_handler_scope().await;
+                            env.set(var, Value::String(item.clone())).await;
+                            b.evaluate(&mut env).await;
+                        }
+                        Some(Value::Null)
+                    }
                     _ => None,
                 }
             }
