@@ -11,6 +11,7 @@ mod evaluator;
 mod sexpr;
 mod value;
 mod error;
+mod dict;
 
 pub use agent::*;
 pub use ast::*;

@@ -23,3 +23,12 @@ a = {
 }
 ----
 (Block (Assign (Variable a) (Dict ("a" 1) ("b" 2))))
+
+
+==== dict without commas
+a = {
+	a: 1
+	b: 2
+}
+----
+(Block (Assign (Variable a) (Dict ("a" 1) ("b" 2))))

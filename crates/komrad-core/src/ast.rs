@@ -269,7 +269,7 @@ impl Pattern {
                 start: 0,
                 end: word.len(),
             },
-            Pattern::VariableCapture(word),
+            Pattern::VariableCapture(word.as_spanned(Span::default())),
         )
     }
 
@@ -281,7 +281,7 @@ impl Pattern {
                 start: 0,
                 end: name.len(),
             },
-            Pattern::BlockCapture(name),
+            Pattern::BlockCapture(name.as_spanned(Span::default())),
         )
     }
 
@@ -361,7 +361,10 @@ mod tests {
             start: 10,
             end: 12,
         };
-        let pat = Pattern::VariableCapture("x".to_string());
+        let pat = Pattern::VariableCapture("x".to_string().as_spanned(span.clone()));
+        let sp_pat = Spanned::new(span.clone(), pat.clone());
+        assert_eq!(sp_pat.span, span);
+        assert_eq!(*sp_pat, pat);
         let sp_pat = Spanned::new(span.clone(), pat.clone());
         assert_eq!(sp_pat.span, span);
         assert_eq!(*sp_pat, pat);

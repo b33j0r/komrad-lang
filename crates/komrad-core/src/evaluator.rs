@@ -1,6 +1,7 @@
 use crate::ast::{AssignmentTarget, Expr, Operator, Spanned, Statement};
 // Reuse the destructuring module for assignments.
 use crate::destructure::{AssignmentAction, AssignmentDestructure, Destructure, DestructureResult};
+use crate::dict::Dict;
 use crate::env::Env;
 use crate::error::RuntimeError;
 use crate::value::Value;
@@ -50,7 +51,7 @@ impl Evaluate for Spanned<Expr> {
             }
             // 3) Dictionary expression.
             Expr::Dict { index_map } => {
-                let mut evaluated = IndexMap::new();
+                let mut evaluated = Dict::new();
                 for (key, val_expr) in index_map {
                     evaluated.insert(key.clone(), val_expr.evaluate(env).await);
                 }
@@ -67,6 +68,7 @@ impl Evaluate for Spanned<Expr> {
                         (Value::Int(a), Value::Float(b)) => Value::Float(a as f64 + b),
                         (Value::Float(a), Value::Int(b)) => Value::Float(a + b as f64),
                         (Value::String(a), Value::String(b)) => Value::String(a + &b),
+
                         // String + Int
                         (Value::String(a), Value::Int(n)) => {
                             format!("{a}{n}").into()
@@ -74,6 +76,7 @@ impl Evaluate for Spanned<Expr> {
                         (Value::Int(n), Value::String(a)) => {
                             format!("{n}{a}").into()
                         }
+
                         // String + Float
                         (Value::String(a), Value::Float(n)) => {
                             format!("{a}{n}").into()
@@ -81,10 +84,14 @@ impl Evaluate for Spanned<Expr> {
                         (Value::Float(n), Value::String(a)) => {
                             format!("{n}{a}").into()
                         }
+
+                        // List + List
                         (Value::List(mut a), Value::List(b)) => {
                             a.extend(b);
                             Value::List(a)
                         }
+
+                        // Dict + Dict
                         (Value::Dict(mut a), Value::Dict(b)) => {
                             a.extend(b);
                             Value::Dict(a)
@@ -99,6 +106,7 @@ impl Evaluate for Spanned<Expr> {
                         (Value::Float(a), Value::Float(b)) => Value::Float(a - b),
                         (Value::Int(a), Value::Float(b)) => Value::Float(a as f64 - b),
                         (Value::Float(a), Value::Int(b)) => Value::Float(a - b as f64),
+                        // String - String (remove the first occurrence of b from a)
                         (Value::String(a), Value::String(b)) => Value::String(a.replacen(&b, "", 1)),
                         _ => Value::Error(
                             RuntimeError::ArgumentError("Type mismatch in subtraction".to_string())
@@ -125,6 +133,25 @@ impl Evaluate for Spanned<Expr> {
                             )
                                 .as_spanned(rhs.span.clone()),
                         ),
+
+                        // List<String> * String (join a with b)
+                        (Value::List(a), Value::String(b)) => {
+                            let mut result = String::new();
+                            for item in a {
+                                if let Value::String(s) = item {
+                                    result.push_str(&s);
+                                    result.push_str(&b);
+                                } else {
+                                    return Value::Error(
+                                        RuntimeError::ArgumentError(
+                                            "Type mismatch in list multiplication".to_string(),
+                                        )
+                                            .as_spanned(rhs.span.clone()),
+                                    );
+                                }
+                            }
+                            Value::String(result)
+                        }
                     },
                     Operator::Divide => match (left, right) {
                         (Value::Int(_), Value::Int(0)) => Value::Error(

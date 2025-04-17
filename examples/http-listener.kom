@@ -11,6 +11,12 @@ Server = {
 			delegate: me
 		}
 	}
+
+	[http _req _res GET] {
+		res template "examples/templates/welcome.html" {
+			title: "Komrad"
+		}
+	}
 }
 
 server = spawn Server {

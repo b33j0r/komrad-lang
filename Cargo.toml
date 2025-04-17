@@ -17,7 +17,7 @@ bytes = "1.10.1"
 base64 = "0.22.1"
 sha1 = "0.11.0-pre.5"
 dashmap = "7.0.0-rc2"
-indexmap = "2.9.0"
+indexmap = { version = "2.9.0", features = ["serde", "arbitrary"] }
 owo-colors = { version = "4.2.0", features = ["alloc"] }
 miette = { version = "7.5.0", features = ["fancy"] }
 nom = "8.0.0"

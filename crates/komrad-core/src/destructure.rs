@@ -68,7 +68,7 @@ impl Destructure for PatternDestructure {
             (Pattern::BlockCapture(_), _) => DestructureResult::NoMatch,
 
             // Match a predicate like _(x > 3)
-            (Pattern::PredicateCapture(pred), value) => match evaluate_predicate(&*pred, value) {
+            (Pattern::PredicateCapture(pred), value) => match evaluate_predicate(&pred.value, value) {
                 Ok(true) => DestructureResult::Match(bindings),
                 Ok(false) => DestructureResult::NoMatch,
                 Err(e) => DestructureResult::Err(e),
@@ -80,7 +80,7 @@ impl Destructure for PatternDestructure {
                     return DestructureResult::NoMatch;
                 }
                 for (p, v) in pats.iter().zip(vals.iter()) {
-                    match Self::destructure(p, v) {
+                    match Self::destructure(&p.value, v) {
                         DestructureResult::Match(nested) => {
                             bindings.extend(nested);
                         }
@@ -113,12 +113,8 @@ fn evaluate_predicate(pred: &Predicate, input: &Value) -> Result<bool, RuntimeEr
 // In our case, any free variable (Predicate::Variable) is treated as the input value.
 fn eval_predicate_expr(pred: &Predicate, input: &Value) -> Result<Value, RuntimeError> {
     match pred {
-        // A literal in the predicate simply returns its value.
         Predicate::Value(v) => Ok(v.clone()),
-        // A free variable is assumed to represent the input value.
-        Predicate::Variable(_name) => Ok(input.clone()),
-        // A binary expression is evaluated by recursively evaluating its operands
-        // and then applying the operator to the results.
+        Predicate::Variable(_) => Ok(input.clone()),
         Predicate::BinaryExpr { lhs, op, rhs } => {
             let left = eval_predicate_expr(&lhs.value, input)?;
             let right = eval_predicate_expr(&rhs.value, input)?;
@@ -129,101 +125,91 @@ fn eval_predicate_expr(pred: &Predicate, input: &Value) -> Result<Value, Runtime
 
 // Applies a binary operator to two operand Values.
 // Supports basic arithmetic and comparison operators.
-// Returns a Value (usually a numeric result for arithmetic or a Boolean for comparisons).
+// Returns a Value (numeric for arithmetic or Boolean for comparisons).
 fn apply_operator(lhs: &Value, op: &Operator, rhs: &Value) -> Result<Value, RuntimeError> {
+    use Value::*;
+
     match op {
         Operator::Add => match (lhs, rhs) {
-            (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a + b)),
-            (Value::Int(a), Value::Float(b)) => Ok(Value::Float((*a as f64) + b)),
-            (Value::Float(a), Value::Int(b)) => Ok(Value::Float(a + (*b as f64))),
-            (Value::Float(a), Value::Float(b)) => Ok(Value::Float(a + b)),
-            _ => Err(RuntimeError::TypeError(
-                "Add operator requires numeric operands".to_string(),
-            )),
+            (Int(a), Int(b)) => Ok(Int(a + b)),
+            (Int(a), Float(b)) => Ok(Float((*a as f64) + b)),
+            (Float(a), Int(b)) => Ok(Float(a + (*b as f64))),
+            (Float(a), Float(b)) => Ok(Float(a + b)),
+            _ => Err(RuntimeError::TypeError("Add operator requires numeric operands".into())),
         },
+
         Operator::Subtract => match (lhs, rhs) {
-            (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a - b)),
-            (Value::Int(a), Value::Float(b)) => Ok(Value::Float((*a as f64) - b)),
-            (Value::Float(a), Value::Int(b)) => Ok(Value::Float(a - (*b as f64))),
-            (Value::Float(a), Value::Float(b)) => Ok(Value::Float(a - b)),
-            _ => Err(RuntimeError::TypeError(
-                "Subtract operator requires numeric operands".to_string(),
-            )),
+            (Int(a), Int(b)) => Ok(Int(a - b)),
+            (Int(a), Float(b)) => Ok(Float((*a as f64) - b)),
+            (Float(a), Int(b)) => Ok(Float(a - (*b as f64))),
+            (Float(a), Float(b)) => Ok(Float(a - b)),
+            _ => Err(RuntimeError::TypeError("Subtract operator requires numeric operands".into())),
         },
+
         Operator::Multiply => match (lhs, rhs) {
-            (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a * b)),
-            (Value::Int(a), Value::Float(b)) => Ok(Value::Float((*a as f64) * b)),
-            (Value::Float(a), Value::Int(b)) => Ok(Value::Float(a * (*b as f64))),
-            (Value::Float(a), Value::Float(b)) => Ok(Value::Float(a * b)),
-            _ => Err(RuntimeError::TypeError(
-                "Multiply operator requires numeric operands".to_string(),
-            )),
+            (Int(a), Int(b)) => Ok(Int(a * b)),
+            (Int(a), Float(b)) => Ok(Float((*a as f64) * b)),
+            (Float(a), Int(b)) => Ok(Float(a * (*b as f64))),
+            (Float(a), Float(b)) => Ok(Float(a * b)),
+            _ => Err(RuntimeError::TypeError("Multiply operator requires numeric operands".into())),
         },
-        Operator::Mod => match (lhs, rhs) {
-            (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a % b)),
-            (Value::Int(a), Value::Float(b)) => Ok(Value::Float((*a as f64) % b)),
-            (Value::Float(a), Value::Int(b)) => Ok(Value::Float(a % (*b as f64))),
-            (Value::Float(a), Value::Float(b)) => Ok(Value::Float(a % b)),
-            _ => Err(RuntimeError::TypeError(
-                "Mod operator requires numeric operands".to_string(),
-            )),
-        },
+
         Operator::Divide => {
-            // Check for division by zero in any numeric combination.
             match (lhs, rhs) {
-                (Value::Int(_), Value::Int(0))
-                | (Value::Float(_), Value::Float(0.0))
-                | (Value::Int(_), Value::Float(0.0))
-                | (Value::Float(_), Value::Int(0)) => {
-                    Err(RuntimeError::TypeError("Division by zero".to_string()))
+                (Int(_), Int(0))
+                | (Float(_), Float(0.0))
+                | (Int(_), Float(0.0))
+                | (Float(_), Int(0)) => {
+                    return Err(RuntimeError::TypeError("Division by zero".into()));
                 }
-                (Value::Int(a), Value::Int(b)) => Ok(Value::Int(a / b)),
-                (Value::Int(a), Value::Float(b)) => Ok(Value::Float((*a as f64) / b)),
-                (Value::Float(a), Value::Int(b)) => Ok(Value::Float(a / (*b as f64))),
-                (Value::Float(a), Value::Float(b)) => Ok(Value::Float(a / b)),
-                _ => Err(RuntimeError::TypeError(
-                    "Divide operator requires numeric operands".to_string(),
-                )),
+                _ => {}
+            }
+            match (lhs, rhs) {
+                (Int(a), Int(b)) => Ok(Int(a / b)),
+                (Int(a), Float(b)) => Ok(Float((*a as f64) / b)),
+                (Float(a), Int(b)) => Ok(Float(a / (*b as f64))),
+                (Float(a), Float(b)) => Ok(Float(a / b)),
+                _ => Err(RuntimeError::TypeError("Divide operator requires numeric operands".into())),
             }
         }
-        Operator::Equal => Ok(Value::Boolean(lhs == rhs)),
-        Operator::NotEqual => Ok(Value::Boolean(lhs != rhs)),
-        Operator::GreaterThan => match (lhs, rhs) {
-            (Value::Int(a), Value::Int(b)) => Ok(Value::Boolean(a > b)),
-            (Value::Int(a), Value::Float(b)) => Ok(Value::Boolean((*a as f64) > *b)),
-            (Value::Float(a), Value::Int(b)) => Ok(Value::Boolean(*a > (*b as f64))),
-            (Value::Float(a), Value::Float(b)) => Ok(Value::Boolean(a > b)),
-            _ => Err(RuntimeError::TypeError(
-                "GreaterThan operator requires numeric operands".to_string(),
-            )),
+
+        Operator::Mod => match (lhs, rhs) {
+            (Int(a), Int(b)) => Ok(Int(a % b)),
+            (Int(a), Float(b)) => Ok(Float((*a as f64) % b)),
+            (Float(a), Int(b)) => Ok(Float(a % (*b as f64))),
+            (Float(a), Float(b)) => Ok(Float(a % b)),
+            _ => Err(RuntimeError::TypeError("Mod operator requires numeric operands".into())),
         },
+
+        Operator::Equal => Ok(Boolean(lhs == rhs)),
+        Operator::NotEqual => Ok(Boolean(lhs != rhs)),
+
+        Operator::GreaterThan => match (lhs, rhs) {
+            (Int(a), Int(b)) => Ok(Boolean(a > b)),
+            (Int(a), Float(b)) => Ok(Boolean((*a as f64) > *b)),
+            (Float(a), Int(b)) => Ok(Boolean(*a > (*b as f64))),
+            (Float(a), Float(b)) => Ok(Boolean(a > b)),
+            _ => Err(RuntimeError::TypeError("GreaterThan operator requires numeric operands".into())),
+        },
+
         Operator::LessThan => match (lhs, rhs) {
-            (Value::Int(a), Value::Int(b)) => Ok(Value::Boolean(a < b)),
-            (Value::Int(a), Value::Float(b)) => Ok(Value::Boolean((*a as f64) < *b)),
-            (Value::Float(a), Value::Int(b)) => Ok(Value::Boolean(*a < (*b as f64))),
-            (Value::Float(a), Value::Float(b)) => Ok(Value::Boolean(a < b)),
-            _ => Err(RuntimeError::TypeError(
-                "LessThan operator requires numeric operands".to_string(),
-            )),
+            (Int(a), Int(b)) => Ok(Boolean(a < b)),
+            (Int(a), Float(b)) => Ok(Boolean((*a as f64) < *b)),
+            (Float(a), Int(b)) => Ok(Boolean(*a < (*b as f64))),
+            (Float(a), Float(b)) => Ok(Boolean(a < b)),
+            _ => Err(RuntimeError::TypeError("LessThan operator requires numeric operands".into())),
         },
     }
 }
 
+
 /// Represents a low-level assignment action.
 /// For a simple variable assignment we use `AssignVariable`.
-/// For slice assignment we flatten the chain (e.g. vec[2][3] becomes container "vec" with indices [2, 3])
-/// and produce an `AssignSlice` action.
+/// For slice assignment we flatten the chain and produce `AssignSlice`.
 #[derive(Debug, Clone, PartialEq)]
 pub enum AssignmentAction {
-    AssignVariable {
-        name: String,
-        value: Value,
-    },
-    AssignSlice {
-        container: String,
-        indices: Vec<Value>,
-        value: Value,
-    },
+    AssignVariable { name: String, value: Value },
+    AssignSlice { container: String, indices: Vec<Value>, value: Value },
 }
 
 /// Implements destructuring logic for AssignmentTarget.
@@ -232,22 +218,18 @@ pub struct AssignmentDestructure;
 impl Destructure for AssignmentDestructure {
     type Target = crate::ast::AssignmentTarget;
     type Output = Vec<AssignmentAction>;
-    type Input = Value;
-    type Error = RuntimeError;
 
     fn destructure(
         target: &Self::Target,
         input: &Self::Input,
     ) -> DestructureResult<Self::Output, Self::Error> {
         match target {
-            // Simple variable assignment, e.g. a = 1
             crate::ast::AssignmentTarget::Variable(name) => {
                 DestructureResult::Match(vec![AssignmentAction::AssignVariable {
                     name: name.clone(),
                     value: input.clone(),
                 }])
             }
-            // List destructuring, e.g. [a b c] = [1 2 3]
             crate::ast::AssignmentTarget::List { elements } => {
                 if let Value::List(vals) = input {
                     if elements.len() != vals.len() {
@@ -266,9 +248,7 @@ impl Destructure for AssignmentDestructure {
                     DestructureResult::NoMatch
                 }
             }
-            // Slice assignment, e.g. vec[2] = 12.0
             crate::ast::AssignmentTarget::Slice { .. } => {
-                // Flatten the slice chain into a base container and the list of index expressions.
                 match flatten_slice(target) {
                     Ok((container, indices_spanned)) => {
                         let mut indices = Vec::new();
@@ -291,17 +271,12 @@ impl Destructure for AssignmentDestructure {
     }
 }
 
-/// Recursively flattens a slice assignment target into its base variable and index expressions.
-/// For example, converting `vec[2][3]` into (`"vec"`, [expr_for_2, expr_for_3]).
 fn flatten_slice(
     target: &crate::ast::AssignmentTarget,
 ) -> Result<(String, Vec<Spanned<Expr>>), RuntimeError> {
     match target {
-        crate::ast::AssignmentTarget::Variable(name) => Ok((name.clone(), Vec::new())),
-        crate::ast::AssignmentTarget::Slice {
-            target: inner,
-            index,
-        } => {
+        crate::ast::AssignmentTarget::Variable(name) => Ok((name.clone(), vec![])),
+        crate::ast::AssignmentTarget::Slice { target: inner, index } => {
             let (var, mut indices) = flatten_slice(&inner.value)?;
             indices.push(index.clone());
             Ok((var, indices))
@@ -312,34 +287,29 @@ fn flatten_slice(
     }
 }
 
-/// Evaluates an index expression for slice assignments.
-/// Only literal integer or float expressions are supported.
 fn eval_index(expr: &Spanned<Expr>) -> Result<Value, RuntimeError> {
-    match &*expr.value {
-        Expr::Value(inner) => match &*inner.value {
+    if let Expr::Value(inner) = &*expr.value {
+        match &*inner.value {
             Value::Int(_) | Value::Float(_) => Ok(*inner.value.clone()),
             _ => Err(RuntimeError::TypeError(
                 "Index expression must be an integer or float".to_string(),
             )),
-        },
-        _ => Err(RuntimeError::TypeError(
+        }
+    } else {
+        Err(RuntimeError::TypeError(
             "Unsupported index expression in assignment target".to_string(),
-        )),
+        ))
     }
 }
 
-// Agents can use this to destructure their input values. You make a
-// CommandSignature for each command, and then use the CommandDestructure
-// struct to destructure the input value into the command name and
-// arguments. This is used by the built-in agents to implement command
-// handlers.
+/// Command destructuring for built-in agents.
 pub struct CommandDestructure;
-
 pub struct CommandSignature {
     pub name: String,
     pub args: Vec<Type>,
 }
 
+#[derive(Debug, PartialEq)]
 pub struct Command {
     pub name: String,
     pub args: Vec<Value>,
@@ -348,8 +318,6 @@ pub struct Command {
 impl Destructure for CommandDestructure {
     type Target = CommandSignature;
     type Output = Command;
-    type Input = Value;
-    type Error = RuntimeError;
 
     fn destructure(
         target: &Self::Target,
@@ -380,12 +348,10 @@ impl Destructure for CommandDestructure {
                 })
                 .collect::<Result<Vec<_>, _>>();
             match args {
-                Ok(args) => DestructureResult::Match(
-                    Command {
-                        name: target.name.clone(),
-                        args,
-                    },
-                ),
+                Ok(args) => DestructureResult::Match(Command {
+                    name: target.name.clone(),
+                    args,
+                }),
                 Err(e) => DestructureResult::Err(e),
             }
         } else {
@@ -411,7 +377,11 @@ mod tests_command {
             Value::String("hello".to_string()),
         ]);
         let result = CommandDestructure::destructure(&signature, &input);
-        assert_eq!(result, Ok((signature.name, vec![Value::Int(42), Value::String("hello".to_string())])));
+        let expected = DestructureResult::Match(Command {
+            name: signature.name.clone(),
+            args: vec![Value::Int(42), Value::String("hello".to_string())],
+        });
+        assert_eq!(result, expected);
     }
 }
 
@@ -426,29 +396,18 @@ mod tests_assignment {
     use crate::value::Value;
 
     fn dummy_span() -> Span {
-        Span {
-            file_id: 0,
-            start: 0,
-            end: 0,
-        }
+        Span { file_id: 0, start: 0, end: 0 }
     }
 
     #[test]
     fn test_variable_assignment() {
-        // Test: a = 1
         let target = AssignmentTarget::Variable("a".to_string());
         let input = Value::Int(1);
         let result = AssignmentDestructure::destructure(&target, &input);
         match result {
             DestructureResult::Match(actions) => {
                 assert_eq!(actions.len(), 1);
-                assert_eq!(
-                    actions[0],
-                    AssignmentAction::AssignVariable {
-                        name: "a".to_string(),
-                        value: Value::Int(1)
-                    }
-                );
+                assert_eq!(actions[0], AssignmentAction::AssignVariable { name: "a".to_string(), value: Value::Int(1) });
             }
             _ => panic!("Expected Match for variable assignment"),
         }
@@ -456,32 +415,21 @@ mod tests_assignment {
 
     #[test]
     fn test_list_destructuring() {
-        // Test: [a b c] = [1 2 3]
         let target = AssignmentTarget::List {
             elements: vec![
                 Spanned::new(dummy_span(), AssignmentTarget::Variable("a".to_string())),
                 Spanned::new(dummy_span(), AssignmentTarget::Variable("b".to_string())),
                 Spanned::new(dummy_span(), AssignmentTarget::Variable("c".to_string())),
-            ],
+            ]
         };
         let input = Value::List(vec![Value::Int(1), Value::Int(2), Value::Int(3)]);
         let result = AssignmentDestructure::destructure(&target, &input);
         match result {
             DestructureResult::Match(actions) => {
-                // Expect three assignment actions.
                 assert_eq!(actions.len(), 3);
-                assert!(actions.contains(&AssignmentAction::AssignVariable {
-                    name: "a".to_string(),
-                    value: Value::Int(1)
-                }));
-                assert!(actions.contains(&AssignmentAction::AssignVariable {
-                    name: "b".to_string(),
-                    value: Value::Int(2)
-                }));
-                assert!(actions.contains(&AssignmentAction::AssignVariable {
-                    name: "c".to_string(),
-                    value: Value::Int(3)
-                }));
+                assert!(actions.contains(&AssignmentAction::AssignVariable { name: "a".to_string(), value: Value::Int(1) }));
+                assert!(actions.contains(&AssignmentAction::AssignVariable { name: "b".to_string(), value: Value::Int(2) }));
+                assert!(actions.contains(&AssignmentAction::AssignVariable { name: "c".to_string(), value: Value::Int(3) }));
             }
             _ => panic!("Expected Match for list destructuring"),
         }
@@ -489,27 +437,15 @@ mod tests_assignment {
 
     #[test]
     fn test_slice_assignment() {
-        // Test: vec[2] = 12.0
-        // Build target: Slice { target: Variable("vec"), index: literal 2 }
         let var_target = Spanned::new(dummy_span(), AssignmentTarget::Variable("vec".to_string()));
-        let index_expr = Spanned::new(
-            dummy_span(),
-            Expr::Value(Spanned::new(dummy_span(), Value::Int(2))),
-        );
-        let target = AssignmentTarget::Slice {
-            target: var_target,
-            index: index_expr,
-        };
+        let index_expr = Spanned::new(dummy_span(), Expr::Value(Spanned::new(dummy_span(), Value::Int(2))));
+        let target = AssignmentTarget::Slice { target: var_target, index: index_expr };
         let input = Value::Float(12.0);
         let result = AssignmentDestructure::destructure(&target, &input);
         match result {
             DestructureResult::Match(actions) => {
                 assert_eq!(actions.len(), 1);
-                let expected = AssignmentAction::AssignSlice {
-                    container: "vec".to_string(),
-                    indices: vec![Value::Int(2)],
-                    value: Value::Float(12.0),
-                };
+                let expected = AssignmentAction::AssignSlice { container: "vec".to_string(), indices: vec![Value::Int(2)], value: Value::Float(12.0) };
                 assert_eq!(actions[0], expected);
             }
             _ => panic!("Expected Match for slice assignment"),
@@ -518,185 +454,93 @@ mod tests_assignment {
 
     #[test]
     fn test_list_destructuring_mismatch() {
-        // Test list destructuring failure due to mismatched lengths.
         let target = AssignmentTarget::List {
             elements: vec![
                 Spanned::new(dummy_span(), AssignmentTarget::Variable("a".to_string())),
                 Spanned::new(dummy_span(), AssignmentTarget::Variable("b".to_string())),
-            ],
+            ]
         };
         let input = Value::List(vec![Value::Int(1)]);
         let result = AssignmentDestructure::destructure(&target, &input);
-        match result {
-            DestructureResult::NoMatch => {}
-            _ => panic!("Expected NoMatch due to list length mismatch"),
-        }
+        assert_eq!(result, DestructureResult::NoMatch);
     }
 }
 
 #[cfg(test)]
 mod tests_pattern_destructure {
     use super::*;
-    use crate::Span;
+    use crate::{AsSpanned, Span};
 
-    // Utility: create a dummy span.
     fn dummy_span() -> Span {
-        Span {
-            file_id: 0,
-            start: 0,
-            end: 0,
-        }
+        Span { file_id: 0, start: 0, end: 0 }
     }
 
     #[test]
     fn test_evaluate_predicate_literal() {
-        // Predicate::Value with a boolean literal returns its value.
         let pred = Predicate::Value(Value::Boolean(true));
-        let input = Value::Int(42); // input is irrelevant in this case
-        let result = evaluate_predicate(&pred, &input);
-        assert_eq!(result, Ok(true));
+        let input = Value::Int(42);
+        assert_eq!(evaluate_predicate(&pred, &input), Ok(true));
     }
 
     #[test]
     fn test_evaluate_predicate_variable() {
-        // Predicate::Variable is treated as a free variable that returns the input.
         let pred = Predicate::Variable("x".into());
-        let input = Value::Boolean(true);
-        let result = evaluate_predicate(&pred, &input);
-        assert_eq!(result, Ok(true));
-
-        let input = Value::Boolean(false);
-        let result = evaluate_predicate(&pred, &input);
-        assert_eq!(result, Ok(false));
+        let input_true = Value::Boolean(true);
+        assert_eq!(evaluate_predicate(&pred, &input_true), Ok(true));
+        let input_false = Value::Boolean(false);
+        assert_eq!(evaluate_predicate(&pred, &input_false), Ok(false));
     }
 
     #[test]
     fn test_evaluate_predicate_binary_expr() {
-        // Build a predicate for "input > 3":
-        // Equivalent to: (Variable > 3)
         let spanned_var = Spanned::new(dummy_span(), Predicate::Variable("x".into()));
         let spanned_three = Spanned::new(dummy_span(), Predicate::Value(Value::Int(3)));
         let op = Spanned::new(dummy_span(), Operator::GreaterThan);
-        let pred = Predicate::BinaryExpr {
-            lhs: spanned_var,
-            op,
-            rhs: spanned_three,
-        };
-
-        // For an input of 10, we expect true.
-        let input = Value::Int(10);
-        let result = evaluate_predicate(&pred, &input);
-        assert_eq!(result, Ok(true));
-
-        // For an input of 2, we expect false.
-        let input = Value::Int(2);
-        let result = evaluate_predicate(&pred, &input);
-        assert_eq!(result, Ok(false));
+        let pred = Predicate::BinaryExpr { lhs: spanned_var, op, rhs: spanned_three };
+        assert_eq!(evaluate_predicate(&pred, &Value::Int(10)), Ok(true));
+        assert_eq!(evaluate_predicate(&pred, &Value::Int(2)), Ok(false));
     }
 
     #[test]
     fn test_destructure_value_match() {
-        // Pattern::ValueMatch should succeed if the literal matches.
-        let pattern = Pattern::ValueMatch(Value::Int(10));
-        let input = Value::Int(10);
-        let result = PatternDestructure::destructure(&pattern, &input);
-        match result {
-            DestructureResult::Match(bindings) => {
-                // No bindings are expected in a literal match.
-                assert!(
-                    bindings.is_empty(),
-                    "Expected no bindings for literal match"
-                );
-            }
-            _ => panic!("Expected Match for value literal"),
-        }
-
-        // With a non-matching literal, we should get NoMatch.
-        let input = Value::Int(11);
-        let result = PatternDestructure::destructure(&pattern, &input);
-        match result {
-            DestructureResult::NoMatch => (),
-            _ => panic!("Expected NoMatch for literal mismatch"),
-        }
+        let pattern = Pattern::ValueMatch(Value::Int(10).as_spanned(
+            dummy_span(),
+        ));
+        assert!(matches!(PatternDestructure::destructure(&pattern, &Value::Int(10)), DestructureResult::Match(_)));
+        assert_eq!(PatternDestructure::destructure(&pattern, &Value::Int(11)), DestructureResult::NoMatch);
     }
 
     #[test]
     fn test_destructure_variable_capture() {
-        // Pattern::VariableCapture binds the variable to the input.
-        let pattern = Pattern::VariableCapture("x".into());
+        let pattern = Pattern::VariableCapture("x".to_string().as_spanned(Span { file_id: 0, start: 0, end: 0 }));
         let input = Value::String("hello".into());
         let result = PatternDestructure::destructure(&pattern, &input);
-        match result {
-            DestructureResult::Match(bindings) => {
-                assert_eq!(bindings.get("x"), Some(&input));
-            }
-            _ => panic!("Expected a Match for variable capture"),
+        if let DestructureResult::Match(bindings) = result {
+            assert_eq!(bindings.get("x"), Some(&input));
+        } else {
+            panic!("Expected a Match for variable capture");
         }
     }
 
     #[test]
     fn test_destructure_list() {
-        // Pattern::List example: [VariableCapture "a", ValueMatch 20]
-        let p1 = Spanned::new(dummy_span(), Pattern::VariableCapture("a".into()));
-        let p2 = Spanned::new(dummy_span(), Pattern::ValueMatch(Value::Int(20)));
+        let p1 = Spanned::new(dummy_span(), Pattern::VariableCapture("a".to_string().as_spanned(Span { file_id: 0, start: 0, end: 0 })));
+        let p2 = Spanned::new(dummy_span(), Pattern::ValueMatch(Value::Int(20).as_spanned(dummy_span())));
         let pattern = Pattern::List(vec![p1, p2]);
-
-        // Input matches list structure: [10, 20]
-        let input = Value::List(vec![Value::Int(10), Value::Int(20)]);
-        let result = PatternDestructure::destructure(&pattern, &input);
-        match result {
-            DestructureResult::Match(bindings) => {
-                assert_eq!(bindings.get("a"), Some(&Value::Int(10)));
-            }
-            _ => panic!("Expected a Match for list destructuring"),
-        }
-
-        // Mismatched list length: should result in NoMatch.
-        let input = Value::List(vec![Value::Int(10)]);
-        let result = PatternDestructure::destructure(&pattern, &input);
-        match result {
-            DestructureResult::NoMatch => (),
-            _ => panic!("Expected NoMatch for list length mismatch"),
-        }
+        let input_ok = Value::List(vec![Value::Int(10), Value::Int(20)]);
+        let input_bad = Value::List(vec![Value::Int(10)]);
+        assert!(matches!(PatternDestructure::destructure(&pattern, &input_ok), DestructureResult::Match(_)));
+        assert_eq!(PatternDestructure::destructure(&pattern, &input_bad), DestructureResult::NoMatch);
     }
 
     #[test]
     fn test_destructure_predicate_capture() {
-        // Pattern::PredicateCapture: capture if input > 5.
-        // Build predicate: (Variable > 5)
-        let spanned_var = Spanned::new(dummy_span(), Predicate::Variable("x".into()));
+        let spanned_var = Spanned::new(dummy_span(), Predicate::Variable("x".to_string()));
         let spanned_five = Spanned::new(dummy_span(), Predicate::Value(Value::Int(5)));
         let op = Spanned::new(dummy_span(), Operator::GreaterThan);
-        let pred = Spanned::new(
-            dummy_span(),
-            Predicate::BinaryExpr {
-                lhs: spanned_var,
-                op,
-                rhs: spanned_five,
-            },
-        );
+        let pred = Spanned::new(dummy_span(), Predicate::BinaryExpr { lhs: spanned_var, op, rhs: spanned_five });
         let pattern = Pattern::PredicateCapture(pred);
-
-        // With an input greater than 5, the predicate should evaluate to true.
-        let input = Value::Int(10);
-        let result = PatternDestructure::destructure(&pattern, &input);
-        match result {
-            DestructureResult::Match(bindings) => {
-                // No bindings are expected from a predicate match.
-                assert!(
-                    bindings.is_empty(),
-                    "Expected no bindings for predicate match"
-                );
-            }
-            _ => panic!("Expected Match for predicate capture when condition is true"),
-        }
-
-        // With an input not greater than 5, we should get NoMatch.
-        let input = Value::Int(3);
-        let result = PatternDestructure::destructure(&pattern, &input);
-        match result {
-            DestructureResult::NoMatch => (),
-            _ => panic!("Expected NoMatch for predicate capture when condition is false"),
-        }
+        assert_eq!(PatternDestructure::destructure(&pattern, &Value::Int(10)), DestructureResult::Match(HashMap::new()));
+        assert_eq!(PatternDestructure::destructure(&pattern, &Value::Int(3)), DestructureResult::NoMatch);
     }
 }

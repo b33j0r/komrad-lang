@@ -50,7 +50,7 @@ impl MessageHandler for SpawnAgent {
                     if let Some(val) = list.get(1) {
                         if let Value::Dict(dict) = val {
                             // Convert the Value::Dict(IndexMap) into the needed initializer
-                            dict.clone()
+                            dict.into()
                         } else {
                             return Some(Value::RemoteError(
                                 "SpawnAgent: second list element must be a dict for initializer"

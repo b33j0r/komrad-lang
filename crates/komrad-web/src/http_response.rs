@@ -184,32 +184,31 @@ impl HttpResponse {
                 Some(Value::Boolean(true))
             }
             "json" => {
-                error!("JSON command is not implemented yet");
-                // if let Some(Value::Dict(dict)) = args.get(0) {
-                //     match serde_json::to_vec(dict) {
-                //         Ok(json_bytes) => {
-                //             self.body.clear();
-                //             self.body.extend_from_slice(&json_bytes);
-                //             self.headers
-                //                 .insert("Content-Type".into(), "application/json".into());
-                //             self.status = 200;
-                //         }
-                //         Err(err) => {
-                //             warn!("Failed to serialize JSON: {}", err);
-                //             self.status = 500;
-                //         }
-                //     }
-                // } else {
-                //     self.status = 400;
-                // }
-                //
-                // let final_msg = self.finalize();
-                // let chan = self.reply_to.clone();
-                // if let Some(msg) = final_msg {
-                //     if let Some(ch) = chan {
-                //         let _ = ch.send(msg).await;
-                //     }
-                // }
+                if let Some(Value::Dict(dict)) = args.get(0) {
+                    match serde_json::to_vec(dict) {
+                        Ok(json_bytes) => {
+                            self.body.clear();
+                            self.body.extend_from_slice(&json_bytes);
+                            self.headers
+                                .insert("Content-Type".into(), "application/json".into());
+                            self.status = 200;
+                        }
+                        Err(err) => {
+                            warn!("Failed to serialize JSON: {}", err);
+                            self.status = 500;
+                        }
+                    }
+                } else {
+                    self.status = 400;
+                }
+
+                let final_msg = self.finalize();
+                let chan = self.reply_to.clone();
+                if let Some(msg) = final_msg {
+                    if let Some(ch) = chan {
+                        let _ = ch.send(msg).await;
+                    }
+                }
                 Some(Value::Boolean(true))
             }
             "redirect" => {
@@ -240,59 +239,54 @@ impl HttpResponse {
 
             "template" => {
                 error!("Template command is not implemented yet");
-                // if let (Some(Value::String(template_path)), Some(Value::Dict(dict_ctx))) =
-                //     (args.get(0), args.get(1))
-                // {
-                //     // 1) Read the template file
-                //     match tokio::fs::read_to_string(template_path).await {
-                //         Ok(template_content) => {
-                //             // 2) Convert the `Value::Dict` into something Tera can handle:
-                //             let mut tera_ctx = tera::Context::new();
-                //
-                //             // If you have a real method to convert Value -> JSON, you can do it:
-                //             for (k, v) in dict_ctx {
-                //                 let json_val = serde_json::to_value(v).unwrap();
-                //                 tera_ctx.insert(k, &json_val);
-                //             }
-                //             //
-                //             // For now, store everything as a string:
-                //             // for (k, v) in dict_ctx {
-                //             //     tera_ctx.insert(k, &v.to_string());
-                //             // }
-                //
-                //             // 3) Render the template
-                //             let result = tera::Tera::one_off(&template_content, &tera_ctx, true);
-                //             match result {
-                //                 Ok(rendered) => {
-                //                     self.body.clear();
-                //                     self.body.extend_from_slice(rendered.as_bytes());
-                //                     self.headers
-                //                         .insert("Content-Type".into(), "text/html".into());
-                //                     self.status = 200;
-                //                 }
-                //                 Err(err) => {
-                //                     warn!("Failed to render Tera template: {}", err);
-                //                     self.status = 500;
-                //                 }
-                //             }
-                //         }
-                //         Err(err) => {
-                //             warn!("Failed to read template file {}: {}", template_path, err);
-                //             self.status = 500;
-                //         }
-                //     }
-                // } else {
-                //     warn!("Expected template path as string and context as dict");
-                //     self.status = 400; // Bad Request
-                // }
-                // // 4) Finalize
-                // let final_msg = self.finalize();
-                // let chan = self.reply_to.clone();
-                // if let Some(msg) = final_msg {
-                //     if let Some(ch) = chan {
-                //         let _ = ch.send(msg).await;
-                //     }
-                // }
+                if let (Some(Value::String(template_path)), Some(Value::Dict(dict_ctx))) =
+                    (args.get(0), args.get(1))
+                {
+                    // 1) Read the template file
+                    match tokio::fs::read_to_string(template_path).await {
+                        Ok(template_content) => {
+                            // 2) Convert the `Value::Dict` into something Tera can handle:
+                            let mut tera_ctx = tera::Context::new();
+
+                            // If you have a real method to convert Value -> JSON, you can do it:
+                            for (k, v) in dict_ctx.iter() {
+                                let json_val = serde_json::to_value(v).unwrap();
+                                tera_ctx.insert(k, &json_val);
+                            }
+
+                            // 3) Render the template
+                            let result = tera::Tera::one_off(&template_content, &tera_ctx, true);
+                            match result {
+                                Ok(rendered) => {
+                                    self.body.clear();
+                                    self.body.extend_from_slice(rendered.as_bytes());
+                                    self.headers
+                                        .insert("Content-Type".into(), "text/html".into());
+                                    self.status = 200;
+                                }
+                                Err(err) => {
+                                    warn!("Failed to render Tera template: {}", err);
+                                    self.status = 500;
+                                }
+                            }
+                        }
+                        Err(err) => {
+                            warn!("Failed to read template file {}: {}", template_path, err);
+                            self.status = 500;
+                        }
+                    }
+                } else {
+                    warn!("Expected template path as string and context as dict");
+                    self.status = 400; // Bad Request
+                }
+                // 4) Finalize
+                let final_msg = self.finalize();
+                let chan = self.reply_to.clone();
+                if let Some(msg) = final_msg {
+                    if let Some(ch) = chan {
+                        let _ = ch.send(msg).await;
+                    }
+                }
                 Some(Value::Boolean(false))
             }
             _ => None,

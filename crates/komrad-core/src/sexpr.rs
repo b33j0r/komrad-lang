@@ -279,7 +279,7 @@ impl ToSExpr for Value {
             }
             Value::Dict(dict) => {
                 let mut sexprs = vec![SExpr::Atom("Dict".to_string())];
-                for (key, value) in dict {
+                for (key, value) in dict.iter() {
                     sexprs.push(SExpr::List(vec![
                         SExpr::Atom(key.to_string()),
                         value.to_sexpr(),

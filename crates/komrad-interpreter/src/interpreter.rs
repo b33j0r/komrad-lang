@@ -5,6 +5,7 @@ use crate::spawn_agent::SpawnAgent;
 use komrad_core::{Agent, AgentFactory, RuntimeError};
 use komrad_core::{CodeAtlas, Env, Evaluate, Spanned, Statement, TopLevel, Value};
 use komrad_parser::parse_toplevel::parse_file_complete;
+use komrad_web::HttpListenerFactory;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
@@ -48,6 +49,8 @@ impl Interpreter {
         let mut env = Env::new(initial_bindings.clone(), initial_handlers);
 
         let mut factory_registry: HashMap<String, Box<dyn AgentFactory + Send + Sync>> = HashMap::new();
+
+        factory_registry.insert("HttpListener".to_string(), Box::new(HttpListenerFactory));
 
         let spawn_agent = SpawnAgent::new(env.clone(), factory_registry);
         let spawn_agent_channel = spawn_agent.spawn();

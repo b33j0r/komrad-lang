@@ -526,6 +526,7 @@ fn parse_dict_expr(input: ParserSpan) -> PResult<Spanned<Expr>> {
         .parse(input)
 }
 
+
 /// Parse a single dict entry `key: expression`.
 fn parse_dict_entry(input: ParserSpan) -> PResult<(String, Spanned<Expr>)> {
     pair(

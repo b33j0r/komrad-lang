@@ -20,8 +20,8 @@ mime_guess = "2.0.5"
 serde.workspace = true
 serde_json.workspace = true
 sha1.workspace = true
-tokio.workspace = true
+tera = { version = "1.20.0", features = ["builtins", "preserve_order", "chrono-tz"] }
 tokio-tungstenite.workspace = true
 tokio-util.workspace = true
+tokio.workspace = true
 tracing.workspace = true
-tera = "1.20.0"
