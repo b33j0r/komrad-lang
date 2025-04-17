@@ -131,12 +131,26 @@ impl Evaluate for Spanned<Expr> {
                         ),
                     },
                     Operator::Subtract => match (left, right) {
+                        // Int - Int
                         (Value::Int(a), Value::Int(b)) => Value::Int(a - b),
                         (Value::Float(a), Value::Float(b)) => Value::Float(a - b),
+
+                        // Int - Float
                         (Value::Int(a), Value::Float(b)) => Value::Float(a as f64 - b),
                         (Value::Float(a), Value::Int(b)) => Value::Float(a - b as f64),
+
                         // String - String (remove the first occurrence of b from a)
                         (Value::String(a), Value::String(b)) => Value::String(a.replacen(&b, "", 1)),
+
+                        // List - Value (remove the first occurrence of b from a)
+                        (Value::List(mut a), b) => {
+                            if let Some(pos) = a.iter().position(|x| x == &b) {
+                                a.remove(pos);
+                            }
+                            Value::List(a)
+                        }
+
+                        // Catch-all
                         _ => Value::Error(
                             RuntimeError::ArgumentError("Type mismatch in subtraction".to_string())
                                 .as_spanned(rhs.span.clone()),
@@ -156,12 +170,6 @@ impl Evaluate for Spanned<Expr> {
                             }
                             Value::String(a.repeat(b as usize))
                         }
-                        _ => Value::Error(
-                            RuntimeError::ArgumentError(
-                                "Type mismatch in multiplication".to_string(),
-                            )
-                                .as_spanned(rhs.span.clone()),
-                        ),
 
                         // List<String> * String (join a with b)
                         (Value::List(a), Value::String(b)) => {
@@ -181,6 +189,13 @@ impl Evaluate for Spanned<Expr> {
                             }
                             Value::String(result)
                         }
+
+                        _ => Value::Error(
+                            RuntimeError::ArgumentError(
+                                "Type mismatch in multiplication".to_string(),
+                            )
+                                .as_spanned(rhs.span.clone()),
+                        ),
                     },
                     Operator::Divide => match (left, right) {
                         (Value::Int(_), Value::Int(0)) => Value::Error(
@@ -200,6 +215,11 @@ impl Evaluate for Spanned<Expr> {
                                 );
                             }
                             Value::List(a.split(&b).map(|s| Value::String(s.to_string())).collect())
+                        }
+                        // For lists, remove all occurrences of the divisor from the list
+                        (Value::List(mut a), b) => {
+                            a.retain(|x| x != &b);
+                            Value::List(a)
                         }
                         _ => Value::Error(
                             RuntimeError::ArgumentError("Type mismatch in division".to_string())
