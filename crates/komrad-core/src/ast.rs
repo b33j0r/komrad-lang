@@ -145,11 +145,6 @@ pub enum Statement {
     /// A pattern/expr pair
     Handler(Arc<Handler>),
 
-    /// Turns a list into a call or a block into an evaluated result in the outer scope.
-    Expand {
-        target: Spanned<Expr>,
-    },
-
     /// A block that is invalid or was parsed incorrectly.
     InvalidBlock,
 }

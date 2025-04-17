@@ -40,16 +40,16 @@ pub trait Agent: MessageHandler + AgentLifecycle {
                 message = listener.recv() => {
                     match message {
                         Ok(msg) => {
-                            if let Some(response) = self.on_message(&msg).await {
-                                if let Some(reply_to) = msg.reply_to {
-                                    match reply_to.send(response.into()).await {
-                                        Ok(_) => {}
-                                        Err(err) => {
-                                            error!("Error sending response: {:?}", err);
-                                        }
+                            let response = self.on_message(&msg).await.unwrap_or(Value::Null);
+                            if let Some(reply_to) = msg.reply_to {
+                                match reply_to.send(response.into()).await {
+                                    Ok(_) => {}
+                                    Err(err) => {
+                                        error!("Error sending response: {:?}", err);
                                     }
                                 }
                             }
+                            
                         }
                         Err(err) => {
                             error!("Error receiving message: {:?}", err);

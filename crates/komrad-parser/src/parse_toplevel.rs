@@ -440,7 +440,7 @@ fn parse_expr_toplevel(input: ParserSpan) -> PResult<Spanned<Expr>> {
 /// Parse an expander expression like `*{ ... }` or `*[ 1 2 ]`.
 fn parse_expander_expr(input: ParserSpan) -> PResult<Spanned<Expr>> {
     spanned::spanned(|i| {
-        preceded(tag("*"), preceded(space0, parse_block_or_dict))
+        preceded(tag("*"), preceded(space0, alt((parse_block_or_dict, parse_list_expr))))
             .map(|block| Expr::Expander { target: block })
             .parse(i)
     })

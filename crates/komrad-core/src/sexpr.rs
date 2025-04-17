@@ -355,9 +355,6 @@ impl ToSExpr for Statement {
                 SExpr::Atom("Handler".to_string()),
                 handler_arc.to_sexpr(),
             ]),
-            Expand { target } => {
-                SExpr::List(vec![SExpr::Atom("Expand".to_string()), target.to_sexpr()])
-            }
             InvalidBlock => SExpr::Atom("InvalidBlock".to_string()),
         }
     }

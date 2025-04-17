@@ -5,7 +5,7 @@ use crate::dict::Dict;
 use crate::env::Env;
 use crate::error::RuntimeError;
 use crate::value::Value;
-use crate::{AsSpanned, Block, Channel, Message, MessageHandler, ToSExpr};
+use crate::{AsSpanned, Block, Channel, CommandDestructure, Message, MessageHandler, ToSExpr};
 use async_trait::async_trait;
 use indexmap::IndexMap;
 use std::future::Future;
@@ -220,7 +220,7 @@ impl Evaluate for Spanned<Expr> {
                     ),
                 }
             }
-            // 5) Ask expression – send_and_recv.
+            // Ask expression – send_and_recv.
             Expr::Ask { target, value } => {
                 // TODO: merge with the `tell` statement
                 let targ = target.evaluate(env).await;
@@ -264,7 +264,7 @@ impl Evaluate for Spanned<Expr> {
                     ),
                 }
             }
-            // 6) Slice expression – index into a list.
+            // Slice expression – index into a list.
             Expr::SliceExpr { target, index } => {
                 let container = target.evaluate(env).await;
                 let idx = index.evaluate(env).await;
@@ -285,15 +285,43 @@ impl Evaluate for Spanned<Expr> {
                     ),
                 }
             }
-            // 7) Expander expression – expand a block or list into scope
+            // Expander expression – expand a block or list into scope
             Expr::Expander { target } => {
+                // Evaluate the thing after the `*`
                 let targ = target.evaluate(env).await;
                 match targ {
-                    Value::Block(b) => {
-                        b.evaluate(env).await
+                    // old block‐expansion stays the same
+                    Value::Block(b) => b.evaluate(env).await,
+
+                    // new: list‐expansion turns `[ch arg1 arg2 …]` into `ch.send_and_recv([arg1,arg2,…])`
+                    Value::List(vs) => {
+                        if vs.is_empty() {
+                            return Value::Error(
+                                RuntimeError::ArgumentError("Cannot expand empty list".to_string())
+                                    .as_spanned(target.span.clone()),
+                            );
+                        }
+                        // split off head + tail
+                        let (head, args) = vs.split_first().unwrap();
+                        match head {
+                            Value::Channel(ch) => {
+                                let payload = Value::List(args.to_vec());
+                                tracing::warn!("Expanding list as message to channel: {:?}", payload);
+                                match ch.send_and_recv(payload).await {
+                                    Ok(reply) => reply,
+                                    Err(e) => Value::Error(e.as_spanned(target.span.clone())),
+                                }
+                            }
+                            _ => Value::Error(
+                                RuntimeError::ArgumentError("First element is not a channel".to_string())
+                                    .as_spanned(target.span.clone()),
+                            ),
+                        }
                     }
+
+                    // everything else is an error
                     _ => Value::Error(
-                        RuntimeError::ArgumentError("Target is not a block".to_string())
+                        RuntimeError::ArgumentError("Target is not a block or list".to_string())
                             .as_spanned(target.span.clone()),
                     ),
                 }
@@ -371,18 +399,6 @@ impl Evaluate for Spanned<Statement> {
                     }
                     _ => Value::Error(
                         RuntimeError::ArgumentError("Target is not a channel".to_string())
-                            .as_spanned(target.span.clone()),
-                    ),
-                }
-            }
-            Statement::Expand { target } => {
-                let targ = target.evaluate(env).await;
-                match targ {
-                    Value::Block(b) => {
-                        b.evaluate(env).await
-                    }
-                    _ => Value::Error(
-                        RuntimeError::ArgumentError("Target is not a block".to_string())
                             .as_spanned(target.span.clone()),
                     ),
                 }
