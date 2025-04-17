@@ -232,8 +232,22 @@ fn parse_assignment_statement(input: ParserSpan) -> PResult<Spanned<Statement>> 
 /// Parse the left-hand side of an assignment, either a single variable or a destructuring list.
 fn parse_assignment_target(input: ParserSpan) -> PResult<Spanned<AssignmentTarget>> {
     spanned::spanned(|i| {
-        alt((parse_destructure_target, parse_identifier.map(AssignmentTarget::Variable))).parse(i)
+        alt((parse_destructure_target, parse_slice, parse_identifier.map(AssignmentTarget::Variable))).parse(i)
     })
+        .parse(input)
+}
+
+/// Parse a slice expression `target[index]` as an assignment target.
+fn parse_slice(input: ParserSpan) -> PResult<AssignmentTarget> {
+    pair(
+        spanned::spanned(|i| parse_identifier.map(AssignmentTarget::Variable).parse(i)),
+        delimited(
+            preceded(multispace0, char('[')),
+            preceded(multispace0, parse_expression),
+            preceded(multispace0, char(']')),
+        ),
+    )
+        .map(|(target, index)| AssignmentTarget::Slice { target, index })
         .parse(input)
 }
 
