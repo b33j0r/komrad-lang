@@ -10,7 +10,7 @@ use async_trait::async_trait;
 use indexmap::IndexMap;
 use std::future::Future;
 use std::pin::Pin;
-use tracing::{debug, error};
+use tracing::{debug, error, trace};
 
 /// A trait specifying how to evaluate an AST node into a `Value`.
 #[async_trait]
@@ -32,7 +32,7 @@ impl Evaluate for Block {
         for stmt in &self.0 {
             result = stmt.evaluate(env).await;
             if result.is_error() {
-                error!("Error in block: {:?}", result);
+                trace!("Error in block: {:?}", result);
                 break;
             }
         }
