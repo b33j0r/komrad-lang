@@ -10,7 +10,7 @@ use komrad_core::{ParseError, Pattern};
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::character::complete::{alpha1, char, line_ending, multispace0, multispace1, not_line_ending, space0, space1};
-use nom::combinator::{map, opt};
+use nom::combinator::{map, opt, recognize, verify};
 use nom::multi::{many0, many1, separated_list0, separated_list1};
 use nom::sequence::{delimited, pair, preceded};
 use nom::{Err as NomErr, IResult, Parser};
@@ -580,18 +580,34 @@ fn parse_number_value(input: ParserSpan) -> IResult<ParserSpan, Spanned<Value>, 
         .parse(input)
 }
 
-/// Parse an identifier (alpha or `_` followed by alphanumerics, `_`, or `-`).
+/// Parse an identifier (alpha followed by alpha, `_`, or `-`).
+/// Must not end with a hyphen.
 fn parse_identifier(input: ParserSpan) -> IResult<ParserSpan, String, ParseError> {
-    (alpha1, many0(alt((alpha1, parse_tag("_"), parse_tag("-")))))
-        .map(|(fst, rest): (ParserSpan, Vec<ParserSpan>)| {
-            let mut out = fst.fragment().to_string();
-            for chunk in rest {
-                out.push_str(chunk.fragment());
-            }
-            out
-        })
-        .parse(input)
+    map(
+        verify(
+            // Recognize the whole pattern as a single slice
+            recognize(
+                pair(
+                    // Starts with one or more alphabetic characters
+                    alpha1,
+                    // Followed by zero or more of: alpha, _, -
+                    many0(
+                        alt((
+                            alpha1,   // Matches one or more alpha chars
+                            tag("_"), // Matches exactly "_"
+                            tag("-")  // Matches exactly "-"
+                        ))
+                    ),
+                )
+            ),
+            // Verify that the recognized slice does not end with a hyphen
+            |s: &ParserSpan| !s.fragment().ends_with('-'),
+        ),
+        // If verification passes, convert the recognized slice fragment to a String
+        |s: ParserSpan| s.fragment().to_string(),
+    ).parse(input)
 }
+
 
 /// Wrap an identifier string in `Value::Word`.
 fn parse_identifier_value(input: ParserSpan) -> IResult<ParserSpan, Spanned<Value>, ParseError> {
