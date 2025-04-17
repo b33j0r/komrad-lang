@@ -85,6 +85,12 @@ impl Evaluate for Spanned<Expr> {
                 let left = lhs.evaluate(env).await;
                 let right = rhs.evaluate(env).await;
                 match op.value.as_ref() {
+                    Operator::Equal => {
+                        Value::Boolean(left == right)
+                    }
+                    Operator::NotEqual => {
+                        Value::Boolean(left != right)
+                    }
                     Operator::Add => match (left, right) {
                         (Value::Int(a), Value::Int(b)) => Value::Int(a + b),
                         (Value::Float(a), Value::Float(b)) => Value::Float(a + b),

@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use indexmap::IndexMap;
 use std::sync::Arc;
 use tokio::select;
-use tracing::{error, info};
+use tracing::{error, trace};
 
 /// An object that spawns a specific type of agent
 #[async_trait]
@@ -72,9 +72,9 @@ pub trait Agent: MessageHandler + AgentLifecycle {
 #[async_trait]
 pub trait AgentLifecycle {
     async fn on_init(&mut self, channel: Channel, initializer_map: IndexMap<String, Value>) {
-        info!("Agent initialized: {:?}", channel);
+        trace!("Agent initialized: {:?}", channel);
         for (key, value) in initializer_map {
-            info!("Initializer: {} = {:?}", key, value);
+            trace!("Initializer: {} = {:?}", key, value);
         }
     }
 

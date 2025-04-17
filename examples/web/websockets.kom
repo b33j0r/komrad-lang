@@ -6,6 +6,10 @@ WsHandler = {
 		socket = socket
 	}
 
+	[ws _socket disconnected] {
+		server disconnect me
+	}
+
 	[ws _socket message _msg] {
 		Log info msg
 		server broadcast me msg
@@ -41,6 +45,7 @@ Server = {
 
 	[ws _socket connect] {
 		client = spawn WsHandler {
+			socket: socket,
 			server: me
 		}
 		clients = clients + [client]
@@ -49,6 +54,13 @@ Server = {
 		history foreach m {
 			socket send m
 		}
+	}
+
+	[disconnect _client] {
+		clients = clients retain x {
+			x != client
+		}
+		Log info "WebSocket disconnected"
 	}
 
 	[broadcast _sender _message] {

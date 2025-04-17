@@ -20,7 +20,7 @@ use tokio_tungstenite::tungstenite::handshake::server::Response;
 use tokio_tungstenite::tungstenite::protocol::{Message as WsMessage, Role};
 use tokio_tungstenite::WebSocketStream;
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, error, info, trace};
+use tracing::{debug, error, info, trace, warn};
 
 #[derive(Agent)]
 pub struct WebSocketAgent {
@@ -55,7 +55,7 @@ impl WebSocketAgent {
 impl AgentLifecycle for WebSocketAgent {
     async fn on_init(&mut self, channel: Channel, _init_map: IndexMap<String, Value>) {
         self.channel = Some(channel);
-        info!("WebSocketAgent {} initialized with channel", self.name);
+        trace!("WebSocketAgent {} initialized with channel", self.name);
     }
 
     async fn on_start(&mut self) {
@@ -87,7 +87,7 @@ impl MessageHandler for WebSocketAgent {
                         if let Some(Value::Channel(delegate_channel)) = list.get(1) {
                             let mut delegate = self.delegate.lock().await;
                             *delegate = Some(delegate_channel.clone());
-                            info!("WebSocketAgent::on_message: set delegate channel");
+                            trace!("WebSocketAgent::on_message: set delegate channel");
                             // Send "ws _socket connected" to delegate using our own channel identity.
                             let msg = Value::List(vec![
                                 Value::Word("ws".into()),
@@ -204,6 +204,7 @@ async fn read_loop(
                         // Optionally handle binary messages here.
                     },
                     Ok(WsMessage::Close(_)) => {
+                        trace!("WebSocketAgent::read_loop: received close message");
                         let msg = Value::List(vec![
                                 Value::Word("ws".into()),
                                 Value::Channel(my_channel.clone()),
@@ -216,6 +217,14 @@ async fn read_loop(
                     },
                     Err(e) => {
                         error!("WebSocketAgent::read_loop: error: {:?}", e);
+                        let msg = Value::List(vec![
+                                Value::Word("ws".into()),
+                                Value::Channel(my_channel.clone()),
+                                Value::Word("disconnect".into()),
+                            ]);
+                        if let Some(delegate) = delegate.lock().await.as_ref() {
+                            let _ = delegate.send(msg).await;
+                        }
                         break;
                     },
                     _ => {}
@@ -352,7 +361,7 @@ pub(crate) async fn handle_websocket_request(
                 ]);
                 match delegate.send_and_recv(msg).await {
                     Ok(_) => {
-                        info!("WebSocketAgent: Delegate notified of connection");
+                        trace!("WebSocketAgent: Delegate notified of connection");
                     }
                     Err(e) => {
                         error!("WebSocketAgent: Failed to notify delegate: {:?}", e);

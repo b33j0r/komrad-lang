@@ -10,7 +10,6 @@ use std::sync::Arc;
 
 #[derive(Agent, Debug, Default)]
 pub struct HttpResponse {
-    name: String,
     reply_to: Option<Channel>,
     status: i64, // Using Int variant from Value
     headers: HashMap<String, String>,
@@ -20,9 +19,8 @@ pub struct HttpResponse {
 }
 
 impl HttpResponse {
-    pub fn new(name: &str, reply_to: Option<Channel>) -> Self {
+    pub fn new(reply_to: Option<Channel>) -> Self {
         Self {
-            name: name.to_string(),
             reply_to,
             ..Default::default()
         }
@@ -238,7 +236,6 @@ impl HttpResponse {
             }
 
             "template" => {
-                error!("Template command is not implemented yet");
                 if let (Some(Value::String(template_path)), Some(Value::Dict(dict_ctx))) =
                     (args.get(0), args.get(1))
                 {
@@ -295,9 +292,4 @@ impl HttpResponse {
 }
 
 #[async_trait]
-impl AgentLifecycle for HttpResponse {
-    async fn on_init(&mut self, _channel: Channel, _init: IndexMap<String, Value>) {
-        info!("HttpResponse on_init: {}", self.name);
-    }
-    // on_start, on_stop => defaults
-}
+impl AgentLifecycle for HttpResponse {}

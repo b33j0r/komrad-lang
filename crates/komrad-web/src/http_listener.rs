@@ -127,7 +127,7 @@ impl HttpListener {
 
         // 2) ephemeral response agent
         let (final_tx, final_rx) = Channel::new();
-        let resp_agent = HttpResponse::new("Response", Some(final_tx));
+        let resp_agent = HttpResponse::new(Some(final_tx));
         let resp_chan = resp_agent.spawn();
 
         // 3) Compose message, e.g. ["http", req_chan, resp_chan, "GET", "some", "path"]

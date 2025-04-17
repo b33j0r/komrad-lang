@@ -5,7 +5,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::{self, Value as JsonValue};
 use std::sync::Arc;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum Value {
     /// Represents a null value.
     Null,
@@ -36,6 +36,49 @@ pub enum Value {
     /// A byte array.
     Bytes(Arc<bytes::Bytes>),
 }
+
+impl PartialEq for Value {
+    fn eq(&self, other: &Self) -> bool {
+        use Value::*;
+        match (self, other) {
+            // null
+            (Null, Null) => true,
+
+            // errors (compare both span and error kind)
+            (Error(e1), Error(e2)) => e1 == e2,
+            (RemoteError(s1), RemoteError(s2)) => s1 == s2,
+
+            // channels (compare channel identity)
+            (Channel(c1), Channel(c2)) => {
+                c1.uuid() == c2.uuid()
+            }
+
+            // lists, dicts, words, booleans, strings, ints
+            (List(l1), List(l2)) => l1 == l2,
+            (Dict(d1), Dict(d2)) => d1 == d2,
+            (Word(w1), Word(w2)) => w1 == w2,
+            (Boolean(b1), Boolean(b2)) => b1 == b2,
+            (String(s1), String(s2)) => s1 == s2,
+            (Int(i1), Int(i2)) => i1 == i2,
+
+            // floats (exact IEEE‑754 equality)
+            (Float(f1), Float(f2)) => f1 == f2,
+
+            // UUIDs
+            (Uuid(u1), Uuid(u2)) => u1 == u2,
+
+            // blocks (Arc<Block> compares the Block contents)
+            (Block(b1), Block(b2)) => b1 == b2,
+
+            // bytes (Arc<Bytes> compares the byte sequences)
+            (Bytes(b1), Bytes(b2)) => b1 == b2,
+
+            // anything else (different variants)
+            _ => false,
+        }
+    }
+}
+
 
 impl Value {
     pub fn is_null(&self) -> bool {

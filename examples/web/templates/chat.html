@@ -18,6 +18,7 @@
 
       h1 {
         font-size: 1.5em;
+        display: none;
       }
 
       html, body {
@@ -81,6 +82,7 @@
       }
 
       #user-info, #user-login {
+        flex: 1;
         display: flex;
         align-items: center;
         gap: 0.5em;
@@ -110,16 +112,9 @@
         color: #0e093b;
       }
 
-      #chat .message {
-        margin: 0.5em 0;
-        padding: 0.5em;
-        background: #1c3693;
-        color: white;
-        border-radius: 0.5em;
-      }
-
-      input[type="text"] {
-        padding: 0.5em;
+      #nameInput {
+        flex: 1;
+        padding: 0.25em;
         border: 2px solid #ccc;
         background: #edf8fd;
         color: #0e093b;
@@ -132,7 +127,24 @@
         color: white;
         cursor: pointer;
         transition: background 0.3s;
+        border-radius: 0.5em;
       }
+
+      #chat .message {
+        margin: 0.5em 0;
+        padding: 0.5em;
+        background: #1c3693;
+        color: white;
+        border-radius: 0.5em;
+      }
+
+      /*input[type="text"] {*/
+      /*  padding: 0.5em;*/
+      /*  border: 2px solid #ccc;*/
+      /*  background: #edf8fd;*/
+      /*  color: #0e093b;*/
+      /*  flex: 1;*/
+      /*}*/
 
       button:hover {
         background: #1a3bbf;
@@ -142,7 +154,7 @@
         padding: 1em;
       }
 
-      /* Media Queries for Responsive Design */
+      /* For large screens */
       @media (min-width: 768px) {
         #outer-container {
           flex-direction: row;
