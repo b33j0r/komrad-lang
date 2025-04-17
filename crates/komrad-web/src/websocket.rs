@@ -180,7 +180,7 @@ async fn read_loop(
                             // Try to parse the incoming text as JSON.
                             let outgoing = if let Ok(json_val) = serde_json::from_str::<serde_json::Value>(&text) {
                                 // Build message with JSON (converted to native dict).
-                                info!("A JSON message was received: {:?}", json_val);
+                                trace!("A JSON message was received: {:?}", json_val);
                                 Value::List(vec![
                                     Value::Word("ws".into()),
                                     Value::Channel(my_channel.clone()),

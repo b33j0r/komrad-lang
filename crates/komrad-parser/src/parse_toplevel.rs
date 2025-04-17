@@ -102,6 +102,7 @@ fn parse_statement(input: ParserSpan) -> PResult<Spanned<Statement>> {
     preceded(
         space0,
         alt((
+            parse_slice_statement,
             parse_assignment_statement,
             parse_handler_statement,
             parse_tell_statement,
@@ -248,6 +249,33 @@ fn parse_slice(input: ParserSpan) -> PResult<AssignmentTarget> {
         ),
     )
         .map(|(target, index)| AssignmentTarget::Slice { target, index })
+        .parse(input)
+}
+
+/// Parse a slice expression `target[index]` as an Expr::SliceExpr.
+fn parse_slice_expr(input: ParserSpan) -> PResult<Spanned<Expr>> {
+    spanned::spanned(|i| {
+        pair(
+            spanned::spanned(|i| parse_identifier_value.map(Expr::Value).parse(i)),
+            delimited(
+                preceded(multispace0, char('[')),
+                preceded(multispace0, parse_expression),
+                preceded(multispace0, char(']')),
+            ),
+        )
+            .map(|(target, index)| Expr::SliceExpr { target, index })
+            .parse(i)
+    })
+        .parse(input)
+}
+
+/// Parse a slice expression `target[index]` as a Statement::Expr.
+fn parse_slice_statement(input: ParserSpan) -> PResult<Spanned<Statement>> {
+    spanned::spanned(|i| {
+        parse_slice_expr
+            .map(Statement::Expr)
+            .parse(i)
+    })
         .parse(input)
 }
 
@@ -436,6 +464,7 @@ fn parse_precedence_expression(
 
 fn parse_expr_toplevel(input: ParserSpan) -> PResult<Spanned<Expr>> {
     alt((
+        parse_slice_expr,
         parse_expander_expr,
         parse_parenthesized_expr,
         parse_list_expr,
