@@ -34,7 +34,7 @@ impl DynamicAgent {
 #[async_trait]
 impl AgentLifecycle for DynamicAgent {
     async fn on_init(&mut self, channel: Channel, initializer_map: IndexMap<String, Value>) {
-        info!("DynamicAgent on_init");
+        trace!("DynamicAgent on_init");
         // Provide "me" so code in the block can reference itself.
         self.me = Some(channel.clone());
         self.env.set("me", Value::Channel(channel.clone())).await;
@@ -44,7 +44,7 @@ impl AgentLifecycle for DynamicAgent {
         // patterns, variables, or do side effects.
 
         let initializer_result = self.block.evaluate(&mut self.env).await;
-        debug!(
+        trace!(
             "DynamicAgent block result: {:?}",
             initializer_result.to_sexpr()
         );
@@ -56,23 +56,20 @@ impl AgentLifecycle for DynamicAgent {
 
         // Debug output
         for handler in self.env.handlers().await {
-            debug!("Handler: {:?}", handler.pattern.value.to_sexpr());
+            trace!("Handler: {:?}", handler.pattern.value.to_sexpr());
         }
         let bindings = self.env.bindings().await;
         for (k, v) in bindings.iter() {
-            debug!("Binding: {} => {:?}", k, v.to_sexpr());
+            trace!("Binding: {} => {:?}", k, v.to_sexpr());
         }
     }
 
     async fn on_start(&mut self) {
-        debug!("DynamicAgent on_start");
-
-        // Like the old system, we forcibly send a "start" message to ourselves.
-        // That triggers any handler matching ["start"], etc.
+        trace!("DynamicAgent on_start");
         let start_msg = Message::new(Value::List(vec![Value::Word("start".to_string())]), None);
         let reply = self.on_message(&start_msg).await;
-        info!(
-            "DynamicAgent on_start; forced 'start' message => {:?}",
+        trace!(
+            "DynamicAgent on_start; `start` message => {:?}",
             reply.to_sexpr()
         );
     }

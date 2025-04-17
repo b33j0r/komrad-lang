@@ -318,7 +318,7 @@ impl Evaluate for Spanned<Statement> {
             ),
             Statement::Handler(handler) => {
                 env.push_handler(handler.clone()).await;
-                debug!("Handler pushed: {:?}", handler.to_sexpr());
+                trace!("Handler pushed: {:?}", handler.to_sexpr());
                 Value::Null
             }
             // For assignment, we now call our shared destructuring function.

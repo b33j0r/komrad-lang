@@ -17,7 +17,7 @@ use tokio::select;
 use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info, trace, warn};
 
 use crate::http_request::HttpRequest;
 use crate::http_response::HttpResponse;
@@ -63,7 +63,7 @@ impl HttpListener {
         let addr_str = format!("{}:{}", config.host, config.port);
         let addr: SocketAddr = addr_str.parse()?;
         let listener = TcpListener::bind(addr).await?;
-        debug!("HTTP listener on http://{}", addr);
+        trace!("HttpListener: listening on http://{}", addr);
 
         let delegate = config.delegate.clone();
         loop {
@@ -266,7 +266,7 @@ impl MessageHandler for HttpListener {
 #[async_trait]
 impl AgentLifecycle for HttpListener {
     async fn on_init(&mut self, _channel: Channel, init_map: IndexMap<String, Value>) {
-        debug!("HttpListener on_init: {:?}", init_map);
+        trace!("HttpListener on_init: {:?}", init_map);
         let mut cport = 8080u16;
         let mut chost = "0.0.0.0".to_string();
         let mut cdelegate = None;

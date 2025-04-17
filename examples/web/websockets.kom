@@ -7,12 +7,12 @@ WsHandler = {
 	}
 
 	[ws _socket message _msg] {
-		Io println msg
-		server broadcast self msg
+		Log info msg
+		server broadcast me msg
 	}
 
 	[send _msg] {
-    	Io println msg
+    	Log info msg
     	socket send msg
     }
 }
@@ -30,7 +30,7 @@ Server = {
         	port: port,
         	delegate: me
         }
-        Io println "Server started on http://" + host + ":" + port
+        Log info "Server started on http://" + host + ":" + port
 	}
 
 	[http _request _response GET] {
@@ -45,7 +45,7 @@ Server = {
 		}
 		clients = clients + [client]
 		socket set-delegate client
-		Io println "WebSocket connected"
+		Log info "WebSocket connected"
 		history foreach m {
 			socket send m
 		}

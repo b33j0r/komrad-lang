@@ -20,7 +20,7 @@ use tokio_tungstenite::tungstenite::handshake::server::Response;
 use tokio_tungstenite::tungstenite::protocol::{Message as WsMessage, Role};
 use tokio_tungstenite::WebSocketStream;
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, trace};
 
 #[derive(Agent)]
 pub struct WebSocketAgent {
@@ -118,7 +118,7 @@ impl MessageHandler for WebSocketAgent {
                             }
                             // For JSON messages – we expect a dict.
                             Some(Value::Dict(dict)) => {
-                                error!("FIXMYLEVEL WebSocketAgent::on_message: send dict: {:?}", dict);
+                                trace!("WebSocketAgent::on_message: send dict: {:?}", dict);
                                 match serde_json::to_string(dict) {
                                     Ok(json_string) => {
                                         let mut sink = self.ws_sink.lock().await;
