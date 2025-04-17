@@ -1,4 +1,5 @@
-use crate::Value;
+use crate::{Message, MessageHandler, Value};
+use async_trait::async_trait;
 use indexmap::IndexMap;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::Value as JsonValue;
@@ -6,6 +7,32 @@ use serde_json::Value as JsonValue;
 #[derive(Debug, Clone, PartialEq)]
 pub struct Dict {
     pub index_map: IndexMap<String, Value>,
+}
+
+#[async_trait]
+impl MessageHandler for Dict {
+    async fn on_message(&mut self, message: &Message) -> Option<Value> {
+        // We expect the message to be a Value::List of terms, e.g. [ Word("len") ]
+        let terms_val = message.value();
+
+        // Only handle Value::List for the terms
+        let Some(Value::List(terms)) = terms_val.clone().into() else {
+            return None; // not a List => no match
+        };
+
+        match &self.index_map {
+            //----------------------
+            // 1) LIST
+            //----------------------
+            _ => {
+                match terms.as_slice() {
+                    // e.g. [ Word("len") ]
+                    [Value::Word(w)] if w.as_str() == "len" => Some(Value::Int(self.index_map.len() as i64)),
+                    _ => None,
+                }
+            }
+        }
+    }
 }
 
 impl From<IndexMap<String, Value>> for Dict {

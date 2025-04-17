@@ -5,7 +5,7 @@ use crate::dict::Dict;
 use crate::env::Env;
 use crate::error::RuntimeError;
 use crate::value::Value;
-use crate::{AsSpanned, ToSExpr};
+use crate::{AsSpanned, Channel, Message, MessageHandler, ToSExpr};
 use async_trait::async_trait;
 use indexmap::IndexMap;
 use std::future::Future;
@@ -199,6 +199,7 @@ impl Evaluate for Spanned<Expr> {
             }
             // 5) Ask expression – send_and_recv.
             Expr::Ask { target, value } => {
+                // TODO: merge with the `tell` statement
                 let targ = target.evaluate(env).await;
                 let val = value.evaluate(env).await;
                 match targ {
@@ -206,6 +207,20 @@ impl Evaluate for Spanned<Expr> {
                         Ok(reply) => reply,
                         Err(e) => Value::Error(e.as_spanned(value.span.clone())),
                     },
+                    Value::Dict(mut dict) => {
+                        let msg = Message::new(val, None);
+                        match dict.on_message(&msg).await {
+                            Some(reply) => {
+                                reply
+                            }
+                            None => {
+                                Value::Error(
+                                    RuntimeError::ArgumentError("No handler found".to_string())
+                                        .as_spanned(value.span.clone()),
+                                )
+                            }
+                        }
+                    }
                     _ => Value::Error(
                         RuntimeError::ArgumentError("Target is not a channel".to_string())
                             .as_spanned(target.span.clone()),
@@ -295,6 +310,18 @@ impl Evaluate for Spanned<Statement> {
                         Ok(_) => Value::Null,
                         Err(e) => Value::Error(e.as_spanned(value.span.clone())),
                     },
+                    Value::Dict(mut dict) => {
+                        let msg = Message::new(val, None);
+                        match dict.on_message(&msg).await {
+                            Some(reply) => reply,
+                            None => {
+                                Value::Error(
+                                    RuntimeError::ArgumentError("No handler found".to_string())
+                                        .as_spanned(value.span.clone()),
+                                )
+                            }
+                        }
+                    }
                     _ => Value::Error(
                         RuntimeError::ArgumentError("Target is not a channel".to_string())
                             .as_spanned(target.span.clone()),

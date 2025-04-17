@@ -217,10 +217,13 @@ pub enum Type {
     Null,
     Int,
     Float,
+    Word,
     String,
     Boolean,
     List,
     Dict,
     Channel,
     Block,
+    Bytes,
+    Uuid,
 }

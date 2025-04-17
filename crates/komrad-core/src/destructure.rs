@@ -323,31 +323,45 @@ impl Destructure for CommandDestructure {
         target: &Self::Target,
         input: &Self::Input,
     ) -> DestructureResult<Self::Output, Self::Error> {
+        // Only List‐messages are valid commands:
         if let Value::List(vals) = input {
-            if vals.len() < 1 {
+            if vals.is_empty() {
                 return DestructureResult::NoMatch;
             }
+
+            // 1) Accept Word or String for the command name:
             let cmd_name = match &vals[0] {
                 Value::String(s) => s.clone(),
+                Value::Word(s) => s.clone(),
                 _ => return DestructureResult::NoMatch,
             };
             if cmd_name != target.name {
                 return DestructureResult::NoMatch;
             }
-            let args = vals[1..]
+
+            // 2) Zip up values + expected types:
+            let args_result = vals[1..]
                 .iter()
                 .zip(&target.args)
-                .map(|(val, ty)| match val {
-                    Value::Int(_) if *ty == Type::Int => Ok(val.clone()),
-                    Value::Float(_) if *ty == Type::Float => Ok(val.clone()),
-                    Value::String(_) if *ty == Type::String => Ok(val.clone()),
-                    _ => Err(RuntimeError::TypeError(format!(
-                        "Expected argument of type {:?}, got {:?}",
-                        ty, val
-                    ))),
+                .map(|(val, ty)| {
+                    match (val, ty) {
+                        // numeric cases unchanged:
+                        (Value::Int(_), Type::Int) |
+                        (Value::Float(_), Type::Float) => Ok(val.clone()),
+
+                        // now accept both String *and* Word for Type::String:
+                        (Value::String(_), Type::String) |
+                        (Value::Word(_), Type::String) => Ok(val.clone()),
+
+                        // everything else is a type‐mismatch:
+                        _ => Err(RuntimeError::TypeError(
+                            format!("Expected {:?}, got {:?}", ty, val)
+                        )),
+                    }
                 })
                 .collect::<Result<Vec<_>, _>>();
-            match args {
+
+            match args_result {
                 Ok(args) => DestructureResult::Match(Command {
                     name: target.name.clone(),
                     args,
@@ -359,6 +373,7 @@ impl Destructure for CommandDestructure {
         }
     }
 }
+
 
 #[cfg(test)]
 mod tests_command {
