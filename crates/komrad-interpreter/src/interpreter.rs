@@ -1,4 +1,3 @@
-use crate::agents::for_agent::ForAgent;
 use crate::agents::fs_agent::FsAgent;
 use crate::agents::io_agent::IoAgent;
 use crate::agents::log_agent::LogAgent;
@@ -53,10 +52,6 @@ impl Interpreter {
         let log_agent_channel = log_agent.spawn();
         initial_bindings.insert("Log".to_string(), Value::Channel(log_agent_channel));
 
-        let for_agent = ForAgent::default();
-        let for_agent_channel = for_agent.spawn();
-        initial_bindings.insert("for".to_string(), Value::Channel(for_agent_channel));
-
         let mut env = Env::new(initial_bindings.clone(), initial_handlers);
 
         let mut factory_registry: HashMap<String, Box<dyn AgentFactory + Send + Sync>> = HashMap::new();
@@ -72,10 +67,6 @@ impl Interpreter {
             env,
             codemaps: CodeAtlas::new(),
         }
-    }
-
-    pub fn codemaps(&self) -> &CodeAtlas {
-        &self.codemaps
     }
 
     pub async fn run_statement(

@@ -1,3 +1,6 @@
+use komrad_core::{Block as KomradBlock, Expr, Spanned, Statement, ToSExpr, TopLevel};
+use komrad_interpreter::{Interpreter, InterpreterError};
+use komrad_parser::parse_toplevel::parse_snippet_complete;
 use ratatui::crossterm::event::{
     self,
     DisableMouseCapture,
@@ -23,7 +26,7 @@ use std::path::{Path, PathBuf};
 use std::{error::Error, io, thread, time::Duration};
 use tokio::{select, sync::mpsc, time};
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info, trace, warn};
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::registry::Registry;
 use tui_logger::{
@@ -31,10 +34,6 @@ use tui_logger::{
     TuiWidgetState,
 };
 use tui_textarea::TextArea;
-
-use komrad_core::ToSExpr;
-use komrad_interpreter::{Interpreter, InterpreterError};
-use komrad_parser::parse_toplevel::parse_snippet_complete;
 
 /// An enum for our internal events.
 enum Event<I> {
@@ -72,6 +71,55 @@ impl std::fmt::Display for MietteErrorWrapper {
 
 impl std::error::Error for MietteErrorWrapper {}
 
+trait MakeInteractive {
+    fn make_interactive(self) -> Self;
+}
+
+impl MakeInteractive for TopLevel {
+    fn make_interactive(self) -> Self {
+        match &self {
+            TopLevel::Statement(s) => {
+                match &*s.value {
+                    Statement::Tell { target, value } => {
+                        trace!("Converting Tell to Ask");
+                        TopLevel::Statement(Spanned {
+                            span: s.span.clone(),
+                            value: Box::new(Statement::Expr(Spanned {
+                                span: s.span.clone(),
+                                value: Box::new(Expr::Ask {
+                                    target: target.clone(),
+                                    value: value.clone(),
+                                }),
+                            })),
+                        })
+                    }
+                    _ => {
+                        self
+                    }
+                }
+            }
+            TopLevel::Block(b) => {
+                // convert the last statement to an interactive expression if it's a Tell
+                let mut statements = b.0.clone();
+                if let Some(last) = statements.last_mut() {
+                    if let Statement::Tell { target, value } = &*last.value {
+                        last.value = Box::new(Statement::Expr(Spanned {
+                            span: last.span.clone(),
+                            value: Box::new(Expr::Ask {
+                                target: target.clone(),
+                                value: value.clone(),
+                            }),
+                        }));
+                    }
+                }
+                trace!("Converting block to interactive");
+                TopLevel::Block(
+                    KomradBlock(statements),
+                )
+            }
+        }
+    }
+}
 
 /// Interpreter hook.
 async fn interpret_input(
@@ -81,6 +129,8 @@ async fn interpret_input(
     let mut codemaps = komrad_core::CodeAtlas::new();
     let top_level = parse_snippet_complete(&mut codemaps, input)
         .map_err(|e| format!("Parse error: {:?}", e))?;
+
+    let top_level = top_level.make_interactive();
 
     let sexpr = top_level.to_sexpr();
     debug!("SEXPR:  {}", sexpr.to_plain_string());
