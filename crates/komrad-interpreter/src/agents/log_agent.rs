@@ -11,20 +11,6 @@ impl Default for LogAgent {
     }
 }
 
-pub enum LogMessage {
-    Trace(Value),
-    Debug(Value),
-    Info(Value),
-    Warning(Value),
-    Error(Value),
-}
-
-impl LogAgent {
-    pub fn new() -> Self {
-        LogAgent
-    }
-}
-
 #[async_trait]
 impl AgentLifecycle for LogAgent {}
 

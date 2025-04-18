@@ -1,4 +1,4 @@
-use crate::{Env, Evaluate, InternalMessageHandler, Message, MessageHandler, Value};
+use crate::{Env, Evaluate, InternalMessageHandler, Message, Value};
 use async_trait::async_trait;
 use indexmap::IndexMap;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -100,7 +100,7 @@ impl Dict {
     }
 
     pub fn remove(&mut self, key: &str) -> Option<Value> {
-        self.index_map.remove(key)
+        self.index_map.shift_remove(key)
     }
 
     pub fn contains_key(&self, key: &str) -> bool {

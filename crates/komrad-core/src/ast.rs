@@ -1,7 +1,6 @@
 use crate::value::Value;
 use crate::RuntimeError;
 use indexmap::IndexMap;
-use nom::error::{FromExternalError, ParseError as NomParseError};
 use std::fmt::Display;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;

@@ -1,10 +1,8 @@
 use bytes::Bytes;
 use http_body_util::combinators::BoxBody;
 use http_body_util::{BodyExt, Empty, Full};
-use hyper::body::Body;
 
-// We create some utility functions to make Empty and Full bodies
-// fit our broadened Response body type.
+#[allow(dead_code)]
 pub fn empty() -> BoxBody<Bytes, hyper::Error> {
     Empty::<Bytes>::new()
         .map_err(|never| match never {})

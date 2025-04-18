@@ -1,5 +1,5 @@
 use crate::interactive::MakeInteractive;
-use komrad_core::{Block as KomradBlock, Expr, Spanned, Statement, ToSExpr, TopLevel};
+use komrad_core::{ToSExpr, Value};
 use komrad_interpreter::{Interpreter, InterpreterError};
 use komrad_parser::parse_toplevel::parse_snippet_complete;
 use ratatui::crossterm::event::{
@@ -22,8 +22,7 @@ use ratatui::{
     widgets::{Block, Borders},
     Terminal,
 };
-use std::error::Report;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::{error::Error, io, thread, time::Duration};
 use tokio::{select, sync::mpsc, time};
 use tokio_util::sync::CancellationToken;
@@ -76,7 +75,7 @@ impl std::error::Error for MietteErrorWrapper {}
 async fn interpret_input(
     input: &str,
     interpreter: &mut Interpreter,
-) -> Result<String, Box<dyn Error>> {
+) -> Result<Value, Box<dyn Error>> {
     let mut codemaps = komrad_core::CodeAtlas::new();
     let top_level = parse_snippet_complete(&mut codemaps, input)
         .map_err(|e| format!("Parse error: {:?}", e))?;
@@ -87,7 +86,7 @@ async fn interpret_input(
     debug!("SEXPR:  {}", sexpr.to_plain_string());
 
     match interpreter.run_top_level(top_level).await {
-        Ok(val) => Ok(val.to_sexpr().to_plain_string()),
+        Ok(val) => Ok(val),
         Err(InterpreterError::RuntimeError(sp)) => {
             // Wrap the miette::eyreish::Report in our custom error.
             Err(Box::new(MietteErrorWrapper(
@@ -270,7 +269,13 @@ pub async fn main(mut interpreter: Interpreter, file: &Option<PathBuf>) -> Resul
                                 input_area = TextArea::default();
 
                                 match interpret_input(&user_input, &mut interpreter).await {
-                                    Ok(result) => warn!("OUTPUT: {}", result),
+                                    Ok(result) => {
+                                        if result == Value::Null {
+                                            trace!("RESULT: Null");
+                                        } else {
+                                            warn!("RESULT: {}", result.to_sexpr().to_plain_string());
+                                        }
+                                    },
                                     Err(e) => error!("ERROR:\n{}", e),
                                 }
                             }

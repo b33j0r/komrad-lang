@@ -45,20 +45,22 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // If no subcommand is provided, default to the REPL command.
     // Thanks to the Default implementation we can do this neatly.
     let command = args.command.unwrap_or_default();
+    let io_uses_tracing = matches!(command, Command::Repl { .. });
+
+    let features = komrad_interpreter::InterpreterFeatures {
+        io_uses_tracing,
+        ..Default::default()
+    };
 
     // Initialize your interpreter.
-    let interpreter = komrad_interpreter::Interpreter::new().await;
+    let interpreter = komrad_interpreter::Interpreter::new(features).await;
 
     // Match on the command.
     match command {
         Command::Repl { file } => {
-            // Call your REPL function.
-            // Here we pass an `Option<&PathBuf>`. Modify your repl::main accordingly if needed.
             crate::repl::main(interpreter, &file).await?;
         }
         Command::Run { file, wait } => {
-            // Call your run function.
-            // Here we pass a `&PathBuf`. Modify your run::main accordingly if needed.
             crate::run::main(interpreter, &file, wait).await;
         }
     }

@@ -1,5 +1,5 @@
 use crate::agents::fs_agent::FsAgent;
-use crate::agents::io_agent::IoAgent;
+use crate::agents::io_agent::{ConsoleIo, IoAgent, IoInterface, TracingIo};
 use crate::agents::log_agent::LogAgent;
 use crate::spawn_agent::SpawnAgent;
 #[allow(unused_imports)]
@@ -9,8 +9,8 @@ use komrad_core::{CodeAtlas, Env, Evaluate, Spanned, Statement, TopLevel, Value}
 use komrad_parser::parse_toplevel::parse_file_complete;
 use komrad_web::HttpListenerFactory;
 use std::collections::HashMap;
-use std::fmt::Display;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use thiserror::Error;
 
 pub type InterpreterResult<T> = Result<T, InterpreterError>;
@@ -35,12 +35,29 @@ pub struct Interpreter {
     env: Env,
 }
 
+pub struct InterpreterFeatures {
+    pub io_uses_tracing: bool,
+}
+
+impl Default for InterpreterFeatures {
+    fn default() -> Self {
+        Self {
+            io_uses_tracing: false,
+        }
+    }
+}
+
 impl Interpreter {
-    pub async fn new() -> Self {
+    pub async fn new(features: InterpreterFeatures) -> Self {
         let mut initial_bindings = HashMap::new();
         let initial_handlers = Vec::new();
 
-        let io_agent = IoAgent::default();
+        let io_interface: Arc<dyn IoInterface + Send + Sync> = if features.io_uses_tracing {
+            Arc::new(TracingIo)
+        } else {
+            Arc::new(ConsoleIo)
+        };
+        let io_agent = IoAgent::new(io_interface);
         let io_agent_channel = io_agent.spawn();
         initial_bindings.insert("Io".to_string(), Value::Channel(io_agent_channel));
 

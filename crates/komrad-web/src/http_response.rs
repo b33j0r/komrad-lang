@@ -1,8 +1,7 @@
 use async_trait::async_trait;
-use indexmap::IndexMap;
-use komrad_core::{Agent, AgentLifecycle, Channel, Message, MessageHandler, RuntimeError, Value};
+use komrad_core::{AgentLifecycle, Channel, Message, MessageHandler, Value};
 use komrad_macros::Agent;
-use tracing::{error, info, warn};
+use tracing::warn;
 
 use bytes::Bytes;
 use std::collections::HashMap;

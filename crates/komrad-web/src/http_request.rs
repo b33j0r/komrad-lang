@@ -3,7 +3,7 @@ use bytes::Bytes;
 use http::{HeaderMap, Request};
 use http_body_util::BodyExt;
 use indexmap::IndexMap;
-use komrad_core::{Agent, AgentLifecycle, Channel, Message, MessageHandler, Value};
+use komrad_core::{AgentLifecycle, Channel, Message, MessageHandler, Value};
 use komrad_macros::Agent;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -21,12 +21,11 @@ pub struct RequestData {
 
 #[derive(Agent, Debug)]
 pub struct HttpRequest {
-    name: String,
     data: Arc<RequestData>,
 }
 
 impl HttpRequest {
-    pub async fn new(agent_name: &str, req: Request<hyper::body::Incoming>) -> Self {
+    pub async fn new(req: Request<hyper::body::Incoming>) -> Self {
         let method = req.method().to_string();
         let url = req.uri().to_string();
         let headers = req.headers().clone();
@@ -45,7 +44,6 @@ impl HttpRequest {
         };
 
         Self {
-            name: agent_name.to_string(),
             data: Arc::new(data),
         }
     }

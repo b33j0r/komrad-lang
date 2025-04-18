@@ -17,11 +17,11 @@ use tokio::select;
 use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, error, info, trace, warn};
+use tracing::{error, trace, warn};
 
 use crate::http_request::HttpRequest;
 use crate::http_response::HttpResponse;
-use crate::web_util::{empty, full};
+use crate::web_util::full;
 use crate::websocket;
 
 #[derive(Clone)]
@@ -120,7 +120,7 @@ impl HttpListener {
         delegate: Channel,
     ) -> Result<Response<BoxBody<Bytes, hyper::Error>>, hyper::Error> {
         // 1) ephemeral request agent
-        let req_agent = HttpRequest::new("Request", req).await;
+        let req_agent = HttpRequest::new(req).await;
         let method_str = req_agent.method().to_string();
         let path_vals: Vec<Value> = req_agent.path().into_iter().map(Value::String).collect();
         let req_chan = req_agent.spawn();
@@ -165,7 +165,7 @@ impl HttpListener {
         // 6) Convert final message -> hyper response
         //    We expect final_msg.value() to be a List of [ status, headers, cookies, body ]
         let val = final_msg.value();
-        let mut resp = Self::build_hyper_response_from_value(val);
+        let resp = Self::build_hyper_response_from_value(val);
         Ok(resp)
     }
 

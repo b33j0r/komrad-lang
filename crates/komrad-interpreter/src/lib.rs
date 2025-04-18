@@ -5,4 +5,4 @@ mod dynamic_agent;
 mod spawn_agent;
 mod agents;
 
-pub use interpreter::{Interpreter, InterpreterError, InterpreterResult};
+pub use interpreter::*;

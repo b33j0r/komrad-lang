@@ -1,13 +1,9 @@
 use async_trait::async_trait;
 use indexmap::IndexMap;
 use std::collections::HashMap;
-use std::sync::Arc;
 use tracing::info;
 
-use komrad_core::{
-    Agent, AgentFactory, AgentLifecycle, Channel, Env, Message, MessageHandler,
-    Value,
-};
+use komrad_core::{Agent, AgentFactory, AgentLifecycle, Env, Message, MessageHandler, Value};
 use komrad_macros::Agent;
 
 use crate::dynamic_agent::DynamicAgent;

@@ -20,7 +20,7 @@ use tokio_tungstenite::tungstenite::handshake::server::Response;
 use tokio_tungstenite::tungstenite::protocol::{Message as WsMessage, Role};
 use tokio_tungstenite::WebSocketStream;
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, error, info, trace, warn};
+use tracing::{error, info, trace};
 
 #[derive(Agent)]
 pub struct WebSocketAgent {
@@ -348,17 +348,23 @@ pub(crate) async fn handle_websocket_request(
         match upgrade_future.await {
             Ok(upgraded) => {
                 let upgraded = TokioIo::new(upgraded);
+
+                // Get the WebSocketStream from the upgraded connection.
                 let ws_stream =
                     WebSocketStream::from_raw_socket(upgraded, Role::Server, None).await;
-                let mut ws_agent = WebSocketAgent::new("WebSocket", ws_stream);
-                let ws_channel = ws_agent.spawn();
-                let ws_channel_clone = ws_channel.clone();
 
+                // Create the agent for this WebSocket connection.
+                let ws_agent = WebSocketAgent::new("WebSocket", ws_stream);
+                let ws_channel = ws_agent.spawn();
+
+                // Build the `ws _socket connect` message.
                 let msg = Value::List(vec![
                     Value::Word("ws".into()),
                     Value::Channel(ws_channel),
                     Value::Word("connect".into()),
                 ]);
+
+                // Notify the delegate of the new connection.
                 match delegate.send_and_recv(msg).await {
                     Ok(_) => {
                         trace!("WebSocketAgent: Delegate notified of connection");

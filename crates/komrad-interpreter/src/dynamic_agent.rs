@@ -1,10 +1,10 @@
 use async_trait::async_trait;
 use indexmap::IndexMap;
 use std::sync::Arc;
-use tracing::{debug, error, info, trace};
+use tracing::{error, info, trace};
 
 use komrad_core::{
-    Agent, AgentLifecycle, Block, Channel, Destructure, DestructureResult, Env, Evaluate, Expr,
+    AgentLifecycle, Block, Channel, Destructure, DestructureResult, Env, Evaluate, Expr,
     Message, MessageHandler, PatternDestructure, ToSExpr, Value,
 };
 use komrad_macros::Agent;

@@ -1,16 +1,12 @@
-use crate::ast::{AssignmentTarget, Expr, Operator, Spanned, Statement};
-// Reuse the destructuring module for assignments.
+use crate::ast::{Expr, Operator, Spanned, Statement};
 use crate::destructure::{AssignmentAction, AssignmentDestructure, Destructure, DestructureResult};
 use crate::dict::Dict;
 use crate::env::Env;
 use crate::error::RuntimeError;
 use crate::value::Value;
-use crate::{AsSpanned, Block, Channel, CommandDestructure, Message, MessageHandler, ToSExpr};
+use crate::{AsSpanned, Block, Message, ToSExpr};
 use async_trait::async_trait;
-use indexmap::IndexMap;
-use std::future::Future;
-use std::pin::Pin;
-use tracing::{debug, trace};
+use tracing::trace;
 
 #[async_trait]
 pub trait InternalMessageHandler {
@@ -115,7 +111,7 @@ impl Evaluate for Spanned<Expr> {
                         }
 
                         // List + List
-                        (Value::List(mut a), Value::List(b)) => {
+                        (Value::List(a), Value::List(b)) => {
                             // make a new list with the elements of both lists
                             let mut new_list = a.clone();
                             new_list.extend(b);
@@ -123,7 +119,7 @@ impl Evaluate for Spanned<Expr> {
                         }
 
                         // Dict + Dict
-                        (Value::Dict(mut a), Value::Dict(b)) => {
+                        (Value::Dict(a), Value::Dict(b)) => {
                             // make a new dict with the elements of both dicts
                             let mut new_dict = a.clone();
                             new_dict.extend(b);
@@ -506,70 +502,6 @@ async fn apply_assignment_actions(
         }
     }
     Value::Null
-}
-
-// ----------------------------------------------------------------
-// Helper functions for slice assignment: get and set target values.
-// These functions recursively retrieve or update the value of the assignment target.
-// ----------------------------------------------------------------
-fn get_target_value<'a>(
-    target: &'a Spanned<AssignmentTarget>,
-    env: &'a mut Env,
-) -> Pin<Box<dyn Future<Output=Value> + Send + 'a>> {
-    Box::pin(async move {
-        match target.value.as_ref() {
-            AssignmentTarget::Variable(name) => env.get(name).await.unwrap_or(Value::Null),
-            AssignmentTarget::Slice {
-                target: slice_target,
-                index,
-            } => {
-                let container_val = get_target_value(slice_target, env).await;
-                let idx_val = index.evaluate(env).await;
-                match (container_val, idx_val) {
-                    (Value::List(vs), Value::Int(i)) => {
-                        if i >= 0 && (i as usize) < vs.len() {
-                            vs[i as usize].clone()
-                        } else {
-                            Value::Null
-                        }
-                    }
-                    _ => Value::Null,
-                }
-            }
-            AssignmentTarget::List { .. } => Value::Null,
-        }
-    })
-}
-
-fn set_target_value<'a>(
-    target: &'a Spanned<AssignmentTarget>,
-    new_val: Value,
-    env: &'a mut Env,
-) -> Pin<Box<dyn Future<Output=Value> + Send + 'a>> {
-    Box::pin(async move {
-        match target.value.as_ref() {
-            AssignmentTarget::Variable(name) => {
-                env.set(name, new_val.clone()).await;
-                new_val
-            }
-            AssignmentTarget::Slice {
-                target: slice_target,
-                index,
-            } => {
-                let mut container_val = get_target_value(slice_target, env).await;
-                let idx_val = index.evaluate(env).await;
-                match (container_val, idx_val) {
-                    (Value::List(mut vs), Value::Int(i)) if i >= 0 && (i as usize) < vs.len() => {
-                        vs[i as usize] = new_val.clone();
-                        let updated = Value::List(vs);
-                        set_target_value(slice_target, updated, env).await
-                    }
-                    _ => Value::Null,
-                }
-            }
-            AssignmentTarget::List { .. } => Value::Null,
-        }
-    })
 }
 
 // -------------------------------

@@ -1,9 +1,8 @@
 use async_trait::async_trait;
-use komrad_core::{Agent, AgentLifecycle, Message, MessageHandler, Value};
+use komrad_core::{AgentLifecycle, Message, MessageHandler, Value};
 use komrad_macros::Agent;
 use std::convert::TryFrom;
 use std::sync::Arc;
-use tracing::{debug, warn};
 
 //
 // IoInterface: allows swapping out the I/O implementation.
@@ -21,6 +20,16 @@ impl IoInterface for ConsoleIo {
     }
     fn println(&self, message: &str) {
         println!("{}", message);
+    }
+}
+
+pub struct TracingIo;
+impl IoInterface for TracingIo {
+    fn print(&self, message: &str) {
+        tracing::warn!("{}", message);
+    }
+    fn println(&self, message: &str) {
+        tracing::warn!("{}", message);
     }
 }
 
@@ -98,7 +107,7 @@ impl TryFrom<Message> for IoAgentMessage {
 #[async_trait]
 impl MessageHandler for IoAgent {
     async fn on_message(&mut self, message: &Message) -> Option<Value> {
-        warn!("IO: {:?}", message.value());
+        tracing::trace!("IO: {:?}", message.value());
         // Convert the incoming message into an IoAgentMessage.
         let io_msg = match IoAgentMessage::try_from(message.clone()) {
             Ok(m) => m,
@@ -109,11 +118,11 @@ impl MessageHandler for IoAgent {
             IoAgentMessage::Print(text) => {
                 self.io_interface.print(&text);
                 // Return a confirmation; you could also return Null.
-                Some(Value::String("Printed".to_string()))
+                None
             }
             IoAgentMessage::Println(text) => {
                 self.io_interface.println(&text);
-                Some(Value::String("Printed with newline".to_string()))
+                None
             }
         }
     }
