@@ -3,3 +3,4 @@
 mod repl;
 pub mod cli;
 mod run;
+mod interactive;
