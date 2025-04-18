@@ -18,6 +18,7 @@ use ratatui::{
     widgets::{Block, Borders},
     Terminal,
 };
+use std::error::Report;
 use std::path::{Path, PathBuf};
 use std::{error::Error, io, thread, time::Duration};
 use tokio::{select, sync::mpsc, time};
@@ -32,7 +33,7 @@ use tui_logger::{
 use tui_textarea::TextArea;
 
 use komrad_core::ToSExpr;
-use komrad_interpreter::Interpreter;
+use komrad_interpreter::{Interpreter, InterpreterError};
 use komrad_parser::parse_toplevel::parse_snippet_complete;
 
 /// An enum for our internal events.
@@ -59,6 +60,19 @@ fn spawn_blocking_event_reader(tx: mpsc::Sender<CrosstermEvent>, shutdown: Cance
     });
 }
 
+/// A wrapper to make miette::eyreish::Report implement the std::error::Error trait.
+#[derive(Debug)]
+struct MietteErrorWrapper(miette::Report);
+
+impl std::fmt::Display for MietteErrorWrapper {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self.0)
+    }
+}
+
+impl std::error::Error for MietteErrorWrapper {}
+
+
 /// Interpreter hook.
 async fn interpret_input(
     input: &str,
@@ -67,26 +81,28 @@ async fn interpret_input(
     let mut codemaps = komrad_core::CodeAtlas::new();
     let top_level = parse_snippet_complete(&mut codemaps, input)
         .map_err(|e| format!("Parse error: {:?}", e))?;
+
     let sexpr = top_level.to_sexpr();
     debug!("SEXPR:  {}", sexpr.to_plain_string());
 
-    let result = interpreter.run_top_level(top_level).await;
-    match result {
-        Ok(value) => {
-            let result_str = value.to_sexpr().to_plain_string();
-            Ok(result_str)
+    match interpreter.run_top_level(top_level).await {
+        Ok(val) => Ok(val.to_sexpr().to_plain_string()),
+        Err(InterpreterError::RuntimeError(sp)) => {
+            // Wrap the miette::eyreish::Report in our custom error.
+            Err(Box::new(MietteErrorWrapper(
+                codemaps.report_runtime_error(&sp),
+            )))
         }
-        Err(e) => Err(format!("Runtime error: {:?}", e).into()),
+        Err(e) => Err(Box::new(e)),
     }
 }
+
 
 /// A custom log formatter for the TUI logger that uses colors based on log levels.
 struct MyLogFormatter;
 
 impl LogFormatter for MyLogFormatter {
-    fn min_width(&self) -> u16 {
-        0
-    }
+    fn min_width(&self) -> u16 { 0 }
 
     fn format(&self, width: usize, evt: &ExtLogRecord) -> Vec<Line> {
         let color = match evt.level {
@@ -96,16 +112,19 @@ impl LogFormatter for MyLogFormatter {
             log::Level::Warn => Color::LightYellow,
             log::Level::Error => Color::LightRed,
         };
-        textwrap::wrap(evt.msg(), width)
-            .iter()
-            .map(|line| {
-                let span =
-                    ratatui::prelude::Span::styled(line.to_string(), Style::default().fg(color));
-                Line::from(span)
+
+        evt.msg()
+            .lines()                                  // ← keep original line‑breaks
+            .flat_map(|ln| textwrap::wrap(ln, width)) // then wrap each line
+            .map(|wrapped| {
+                Line::from(
+                    ratatui::prelude::Span::styled(wrapped.to_string(),
+                                                   Style::default().fg(color)))
             })
             .collect()
     }
 }
+
 
 // -- snip previous imports --
 

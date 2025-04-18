@@ -17,3 +17,4 @@ tokio.workspace = true
 tracing.workspace = true
 uuid.workspace = true
 serde_json.workspace = true
+miette.workspace = true

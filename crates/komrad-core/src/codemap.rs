@@ -1,6 +1,7 @@
-// parser/codemap.rs
-
-use crate::ast::Span;
+// komrad_core/src/codemap.rs
+use crate::ast::{Span, Spanned};
+use crate::RuntimeError;
+use miette::{miette, LabeledSpan, NamedSource};
 use nom_locate::LocatedSpan;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -76,7 +77,7 @@ impl CodeMap {
     }
 }
 
-/// Holds many CodeMaps and provides file ID allocation
+/// Holds many CodeMaps and provides file‑ID allocation
 #[derive(Debug, Default)]
 pub struct CodeAtlas {
     files: HashMap<usize, CodeMap>,
@@ -99,12 +100,10 @@ impl CodeAtlas {
         let arc = Arc::new(source.to_string());
         let map = CodeMap::new(file_id, arc.clone(), file_path);
 
-        // First insert the map into files
         self.files.insert(file_id, map);
 
-        // Then create the span from the stored map
+        // Return a span at offset0 so the caller can continue parsing.
         let span = self.files.get(&file_id).unwrap().parser_span();
-
         span
     }
 
@@ -119,5 +118,39 @@ impl CodeAtlas {
             let end = span.end.min(s.len());
             &s[start..end]
         })
+    }
+
+    // ────────────────────────────────────────────────────────────────
+    // New helpers: turn a Spanned<RuntimeError> into a pretty miette report
+    // ────────────────────────────────────────────────────────────────
+
+    /// Build a [`miette::NamedSource`] from a span.
+    pub fn named_source(&self, span: &Span) -> Option<NamedSource<String>> {
+        self.get_codemap(span.file_id).map(|cm| {
+            let name = cm
+                .file_path
+                .as_ref()
+                .map(|p| p.to_string_lossy().to_string())
+                .unwrap_or_else(|| "<repl>".to_owned());
+            NamedSource::new(name, cm.source.as_str().to_owned())
+        })
+    }
+
+    /// Convert any `Spanned<RuntimeError>` into a [`miette::Report`] with labels.
+    // komrad_core/src/codemap.rs
+    pub fn report_runtime_error(&self, err: &Spanned<RuntimeError>) -> miette::Report {
+        let span = &err.span;
+        if let Some(src) = self.named_source(span) {
+            let label = LabeledSpan::at(span.start..span.end, err.value.to_string());
+            miette!(
+            labels = vec![label],
+            "{}",                      // primary msg
+            err.value
+        ).with_source_code(
+                src,
+            )
+        } else {
+            miette!("{}", err.value)
+        }
     }
 }

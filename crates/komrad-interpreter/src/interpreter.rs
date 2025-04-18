@@ -3,7 +3,9 @@ use crate::agents::fs_agent::FsAgent;
 use crate::agents::io_agent::IoAgent;
 use crate::agents::log_agent::LogAgent;
 use crate::spawn_agent::SpawnAgent;
-use komrad_core::{Agent, AgentFactory, ParseError, RuntimeError};
+#[allow(unused_imports)]
+use komrad_core::Agent;
+use komrad_core::{AgentFactory, ParseError, RuntimeError};
 use komrad_core::{CodeAtlas, Env, Evaluate, Spanned, Statement, TopLevel, Value};
 use komrad_parser::parse_toplevel::parse_file_complete;
 use komrad_web::HttpListenerFactory;
@@ -70,6 +72,10 @@ impl Interpreter {
             env,
             codemaps: CodeAtlas::new(),
         }
+    }
+
+    pub fn codemaps(&self) -> &CodeAtlas {
+        &self.codemaps
     }
 
     pub async fn run_statement(

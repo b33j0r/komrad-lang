@@ -19,7 +19,7 @@ sha1 = "0.11.0-pre.5"
 dashmap = "7.0.0-rc2"
 indexmap = { version = "2.9.0", features = ["serde", "arbitrary"] }
 owo-colors = { version = "4.2.0", features = ["alloc"] }
-miette = { version = "7.5.0", features = ["fancy"] }
+miette = { version = "7.5.0", features = ["fancy", "derive"] }
 nom = "8.0.0"
 nom_locate = "5.0.0"
 serde = { version = "1.0", features = ["derive", "std", "rc", "alloc"] }
