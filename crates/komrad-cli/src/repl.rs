@@ -270,7 +270,7 @@ pub async fn main(mut interpreter: Interpreter, file: &Option<PathBuf>) -> Resul
 
                                 match interpret_input(&user_input, &mut interpreter).await {
                                     Ok(result) => warn!("OUTPUT: {}", result),
-                                    Err(e) => error!("ERROR:  {}", e),
+                                    Err(e) => error!("ERROR:\n{}", e),
                                 }
                             }
                             KeyCode::Up => {

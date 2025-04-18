@@ -1,7 +1,7 @@
 use crate::ast::Pattern;
 use crate::error::RuntimeError;
 use crate::value::Value;
-use crate::{Expr, Operator, Predicate, Spanned, Type};
+use crate::{AssignmentTarget, Expr, Operator, Predicate, Spanned, Type};
 use std::collections::HashMap;
 
 /// Match result type for destructuring:
@@ -224,31 +224,51 @@ impl Destructure for AssignmentDestructure {
         input: &Self::Input,
     ) -> DestructureResult<Self::Output, Self::Error> {
         match target {
-            crate::ast::AssignmentTarget::Variable(name) => {
+            AssignmentTarget::Variable(name) => {
                 DestructureResult::Match(vec![AssignmentAction::AssignVariable {
                     name: name.clone(),
                     value: input.clone(),
                 }])
             }
-            crate::ast::AssignmentTarget::List { elements } => {
-                if let Value::List(vals) = input {
-                    if elements.len() != vals.len() {
-                        return DestructureResult::NoMatch;
-                    }
-                    let mut actions = Vec::new();
-                    for (elem, val) in elements.iter().zip(vals.iter()) {
-                        match Self::destructure(&elem.value, val) {
-                            DestructureResult::Match(mut acts) => actions.append(&mut acts),
-                            DestructureResult::NoMatch => return DestructureResult::NoMatch,
-                            DestructureResult::Err(e) => return DestructureResult::Err(e),
+            AssignmentTarget::List { elements } => {
+                match input {
+                    Value::List(vals) => {
+                        if elements.len() != vals.len() {
+                            return DestructureResult::Err(
+                                RuntimeError::ArgumentError(format!(
+                                    "List pattern length mismatch: expected {}, got {}",
+                                    elements.len(),
+                                    vals.len()
+                                )),
+                            );
                         }
+
+                        let mut actions = Vec::new();
+                        for (elem, val) in elements.iter().zip(vals.iter()) {
+                            match Self::destructure(&elem.value, val) {
+                                DestructureResult::Match(mut acts) => actions.append(&mut acts),
+                                DestructureResult::NoMatch => {
+                                    return DestructureResult::Err(RuntimeError::ArgumentError(
+                                        "Nested list element did not match".to_string(),
+                                    ));
+                                }
+                                DestructureResult::Err(e) => return DestructureResult::Err(e),
+                            }
+                        }
+
+                        DestructureResult::Match(actions)
                     }
-                    DestructureResult::Match(actions)
-                } else {
-                    DestructureResult::NoMatch
+
+                    other => {
+                        DestructureResult::Err(RuntimeError::ArgumentError(format!(
+                            "Cannot destructure {:?} into a list pattern",
+                            other
+                        )))
+                    }
                 }
             }
-            crate::ast::AssignmentTarget::Slice { .. } => {
+
+            AssignmentTarget::Slice { .. } => {
                 match flatten_slice(target) {
                     Ok((container, indices_spanned)) => {
                         let mut indices = Vec::new();
