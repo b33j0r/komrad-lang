@@ -116,15 +116,21 @@ impl Evaluate for Spanned<Expr> {
 
                         // List + List
                         (Value::List(mut a), Value::List(b)) => {
-                            a.extend(b);
-                            Value::List(a)
+                            // make a new list with the elements of both lists
+                            let mut new_list = a.clone();
+                            new_list.extend(b);
+                            Value::List(new_list)
                         }
 
                         // Dict + Dict
                         (Value::Dict(mut a), Value::Dict(b)) => {
-                            a.extend(b);
-                            Value::Dict(a)
+                            // make a new dict with the elements of both dicts
+                            let mut new_dict = a.clone();
+                            new_dict.extend(b);
+                            Value::Dict(new_dict)
                         }
+
+                        // Catch-all
                         _ => Value::Error(
                             RuntimeError::ArgumentError("Type mismatch in addition".to_string())
                                 .as_spanned(rhs.span.clone()),
