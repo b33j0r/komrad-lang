@@ -11,6 +11,8 @@ from smalltalk and lisp.
 * An agent can be spawned from a block containing pattern-matching handlers
 * Agents all the way down (e.g. `spawn Bob` sends a message to the `SpawnAgent`)
 
+### Example
+
 ```komrad
 Bob = {
 	[start] {
@@ -37,6 +39,8 @@ alice = spawn Alice {
 	bob: bob
 }
 ```
+
+See [the examples](https://github.com/b33j0r/komrad-lang/tree/main/examples) for more.
 
 ## Development
 
