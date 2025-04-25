@@ -13,28 +13,28 @@ from smalltalk and lisp.
 
 ```komrad
 Bob = {
-	[start] {
-		Io println "Hello, I'm Bob."
-	}
+    [start] {
+        Io println "Hello, I'm Bob."
+    }
 
-	[message _msg] {
-		Io println "Bob received message: '" + msg + "'"
-	}
+    [message _msg] {
+        Io println "Bob received message: '" + msg + "'"
+    }
 }
 
 bob = spawn Bob
 
 Alice = {
-	bob = null
+    bob = null
 
-	[start] {
-		Io println "Hello, I'm Alice."
-		bob message "Hello Bob!"
-	}
+    [start] {
+        Io println "Hello, I'm Alice."
+        bob message "Hello Bob!"
+    }
 }
 
 alice = spawn Alice {
-	bob: bob
+    bob: bob
 }
 ```
 
