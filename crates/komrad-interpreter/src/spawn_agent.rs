@@ -1,6 +1,8 @@
 use async_trait::async_trait;
+use dashmap::DashMap;
 use indexmap::IndexMap;
 use std::collections::HashMap;
+use std::sync::Arc;
 use tracing::info;
 
 use komrad_core::{Agent, AgentFactory, AgentLifecycle, Env, Message, MessageHandler, Value};
@@ -13,14 +15,14 @@ use crate::dynamic_agent::DynamicAgent;
 pub struct SpawnAgent {
     pub env: Env,
     // For named (non-block) agents, we have a registry of factories:
-    pub factory_registry: HashMap<String, Box<dyn AgentFactory + Send + Sync>>,
+    pub factory_registry: Arc<DashMap<String, Box<dyn AgentFactory + Send + Sync>>>,
 }
 
 impl SpawnAgent {
     /// Create a new SpawnAgent with the given environment and factory registry.
     pub fn new(
         env: Env,
-        factory_registry: HashMap<String, Box<dyn AgentFactory + Send + Sync>>,
+        factory_registry: Arc<DashMap<String, Box<dyn AgentFactory + Send + Sync>>>,
     ) -> Self {
         SpawnAgent { env, factory_registry }
     }

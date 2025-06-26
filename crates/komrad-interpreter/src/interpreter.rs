@@ -1,8 +1,9 @@
 use crate::agents::fs_agent::FsAgent;
 use crate::agents::io_agent::{ConsoleIo, IoAgent, IoInterface, TracingIo};
 use crate::agents::log_agent::LogAgent;
+use crate::import_agent::ImportAgent;
 use crate::spawn_agent::SpawnAgent;
-#[allow(unused_imports)]
+use dashmap::DashMap;
 use komrad_core::Agent;
 use komrad_core::{AgentFactory, ParseError, RuntimeError};
 use komrad_core::{CodeAtlas, Env, Evaluate, Spanned, Statement, TopLevel, Value};
@@ -71,11 +72,19 @@ impl Interpreter {
 
         let mut env = Env::new(initial_bindings.clone(), initial_handlers);
 
-        let mut factory_registry: HashMap<String, Box<dyn AgentFactory + Send + Sync>> = HashMap::new();
+        let mut factory_registry: Arc<DashMap<String, Box<dyn AgentFactory + Send + Sync>>> = Arc::new(DashMap::new());
 
         factory_registry.insert("HttpListener".to_string(), Box::new(HttpListenerFactory));
 
-        let spawn_agent = SpawnAgent::new(env.clone(), factory_registry);
+        let import_agent = ImportAgent::new(
+            env.clone(),
+            factory_registry.clone(),
+            std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")), // Start with current working directory
+        );
+        let import_agent_channel = import_agent.spawn();
+        env.set("import", Value::Channel(import_agent_channel)).await;
+
+        let spawn_agent = SpawnAgent::new(env.clone(), factory_registry.clone());
         let spawn_agent_channel = spawn_agent.spawn();
 
         env.set("spawn", Value::Channel(spawn_agent_channel)).await;

@@ -1,6 +1,6 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{Data, DeriveInput, Fields, Variant, parse_macro_input};
+use syn::{parse_macro_input, Data, DeriveInput, Fields, Variant};
 
 /// The Agent derive macro
 #[proc_macro_derive(Agent)]
@@ -24,7 +24,7 @@ pub fn agent_derive(input: TokenStream) -> TokenStream {
                 channel
             }
 
-            fn spawn_with_initializer(mut self: Box<Self>, initializer_map: indexmap::IndexMap<String, Value>) -> komrad_core::Channel {
+            fn spawn_with_initializer(mut self: Box<Self>, initializer_map: indexmap::IndexMap<String, komrad_core::Value>) -> komrad_core::Channel {
                 let (channel, listener) = komrad_core::Channel::new();
 
                 let run_channel = channel.clone();
@@ -106,7 +106,7 @@ fn derive_for_struct(name: &syn::Ident, data: &syn::DataStruct) -> TokenStream {
                         }
                         Ok(())
                     })
-                    .ok();
+                        .ok();
                 }
             }
         }
