@@ -148,6 +148,7 @@ fn parse_pattern(input: ParserSpan) -> PResult<Spanned<Pattern>> {
 fn parse_pattern_element(input: ParserSpan) -> PResult<Spanned<Pattern>> {
     spanned::spanned(|i| {
         alt((
+            parse_predicate_capture,
             parse_variable_capture.map(Pattern::VariableCapture),
             parse_block_capture.map(Pattern::BlockCapture),
             parse_identifier_value.map(Pattern::ValueMatch),
@@ -156,6 +157,20 @@ fn parse_pattern_element(input: ParserSpan) -> PResult<Spanned<Pattern>> {
         ))
             .parse(i)
     })
+        .parse(input)
+}
+
+/// Parses a predicate capture `_(cond==true)` as a pattern.
+fn parse_predicate_capture(input: ParserSpan) -> PResult<Pattern> {
+    preceded(
+        tag("_"),
+        delimited(
+            char('('),
+            parse_predicate,
+            char(')'),
+        ),
+    )
+        .map(Pattern::PredicateCapture)
         .parse(input)
 }
 
@@ -473,6 +488,9 @@ fn parse_expr_toplevel(input: ParserSpan) -> PResult<Spanned<Expr>> {
         map(parse_number_value, |val| {
             Spanned::new(val.span.clone(), Expr::Value(val))
         }),
+        map(parse_bool_value, |val| {
+            Spanned::new(val.span.clone(), Expr::Value(val))
+        }),
         map(parse_identifier_value, |val| {
             Spanned::new(val.span.clone(), Expr::Value(val))
         }),
@@ -606,6 +624,35 @@ fn parse_binary_operator(input: ParserSpan) -> IResult<ParserSpan, Spanned<Opera
         .parse(input)
 }
 
+// ────────────────────────────────────────────────────────────────────────────
+//  Boolean literal     true | false   →  Value::Boolean
+// ────────────────────────────────────────────────────────────────────────────
+fn parse_bool_value(
+    input: ParserSpan,
+) -> IResult<ParserSpan, Spanned<Value>, ParseError> {
+    spanned::spanned(|i| {
+        alt((
+            map(parse_tag("true"), |_| Value::Boolean(true)),
+            map(parse_tag("false"), |_| Value::Boolean(false)),
+        )).parse(i)
+    })
+        .parse(input)
+}
+
+fn parse_predicate(
+    input: ParserSpan,
+) -> PResult<Spanned<komrad_core::Predicate>> {
+    spanned::spanned(|i| {
+        parse_bool_value
+            .map(
+                |v| komrad_core::Predicate::Value(*v.value.clone()),
+            )
+            .parse(i)
+    })
+        .parse(input)
+}
+
+
 /// Parse a numeric literal into `Value::Int`.
 fn parse_number_value(input: ParserSpan) -> IResult<ParserSpan, Spanned<Value>, ParseError> {
     spanned::spanned(|i| {
@@ -653,7 +700,7 @@ fn parse_identifier(input: ParserSpan) -> IResult<ParserSpan, String, ParseError
 
 
 /// Wrap an identifier string in `Value::Word`.
-fn parse_identifier_value(input: ParserSpan) -> IResult<ParserSpan, Spanned<Value>, ParseError> {
+fn parse_identifier_value(input: ParserSpan) -> PResult<Spanned<Value>> {
     spanned::spanned(|i| parse_identifier.map(Value::Word).parse(i)).parse(input)
 }
 
@@ -852,5 +899,19 @@ pub mod parser_tests {
         let stmt_span = &stmts[0].span;
         let snippet = &input[stmt_span.start..stmt_span.end];
         assert_eq!(snippet, "789");
+    }
+
+    #[test]
+    fn test_parse_predicate_pattern() {
+        let input = "[_(true) _{consequent}] { *consequent }";
+        let stmts = parse_complete(input).expect("should parse conditional handler");
+        assert_eq!(stmts.len(), 1);
+    }
+
+    #[test]
+    fn test_parse_if_example() {
+        let input = "If = {\n\t[_(true) _{consequent}] {\n\t\t*consequent\n\t}\n\n\t[_(false) _{consequent}] {}\n}";
+        let stmts = parse_complete(input).expect("should parse If definition");
+        assert_eq!(stmts.len(), 1);
     }
 }

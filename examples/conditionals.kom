@@ -1,0 +1,43 @@
+# Basic test for predicate-based conditionals in Komrad
+
+If = {
+	[_(true) _{consequent}] {
+		*consequent
+	}
+
+	[_(false) _{consequent}] {}
+
+	[_(true) _{consequent} else _{alternative}] {
+		*consequent
+	}
+
+	[_(false) _{consequent} else _{alternative}] {
+		*alternative
+	}
+}
+
+if = spawn If {}
+
+# Test with true condition
+if (true) {
+	Io println "This will be printed because the condition is true."
+}
+
+# Test with false condition
+if (false) {
+	Io println "This will not be printed because the condition is false."
+}
+
+# Test with else clause
+if (true) {
+	Io println "This will be printed because the condition is true."
+} else {
+	Io println "This will not be printed because the condition is true."
+}
+
+# Test with else clause when condition is false
+if (false) {
+	Io println "This will not be printed because the condition is false."
+} else {
+	Io println "This will be printed because the condition is false."
+}

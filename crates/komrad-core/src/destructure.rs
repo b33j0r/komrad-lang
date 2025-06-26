@@ -3,6 +3,7 @@ use crate::error::RuntimeError;
 use crate::value::Value;
 use crate::{AssignmentTarget, Expr, Operator, Predicate, Spanned, Type};
 use std::collections::HashMap;
+use tracing::{info, trace};
 
 /// Match result type for destructuring:
 /// - `Match(O)` means successful destructuring
@@ -100,9 +101,13 @@ impl Destructure for PatternDestructure {
 // Top-level function: evaluates a predicate against an input Value and returns a boolean.
 // It expects the evaluated result to be a Value::Boolean; otherwise it fails.
 fn evaluate_predicate(pred: &Predicate, input: &Value) -> Result<bool, RuntimeError> {
+    trace!("Evaluating predicate: {:?} with input: {:?}", pred, input);
     let val = eval_predicate_expr(pred, input)?;
     match val {
-        Value::Boolean(b) => Ok(b),
+        Value::Boolean(b) => {
+            trace!("Predicate evaluated to: {:?}", b);
+            Ok(b)
+        }
         _ => Err(RuntimeError::TypeError(
             "Predicate did not evaluate to a boolean".to_string(),
         )),
@@ -113,7 +118,7 @@ fn evaluate_predicate(pred: &Predicate, input: &Value) -> Result<bool, RuntimeEr
 // In our case, any free variable (Predicate::Variable) is treated as the input value.
 fn eval_predicate_expr(pred: &Predicate, input: &Value) -> Result<Value, RuntimeError> {
     match pred {
-        Predicate::Value(v) => Ok(v.clone()),
+        Predicate::Value(val) => Ok(Value::Boolean(val == input)),
         Predicate::Variable(_) => Ok(input.clone()),
         Predicate::BinaryExpr { lhs, op, rhs } => {
             let left = eval_predicate_expr(&lhs.value, input)?;
