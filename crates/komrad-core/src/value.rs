@@ -9,10 +9,9 @@ use std::sync::Arc;
 pub enum Value {
     /// Represents a null value.
     Null,
-    /// TODO: is this a value?
     Error(Spanned<RuntimeError>),
     /// Represents a channel for sending messages (assume external definition).
-    Channel(crate::channel::Channel),
+    Channel(Channel),
     /// Represents a list of values.
     List(Vec<Value>),
     /// Represents a dict of values.

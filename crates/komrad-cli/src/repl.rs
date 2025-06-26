@@ -104,7 +104,7 @@ struct MyLogFormatter;
 impl LogFormatter for MyLogFormatter {
     fn min_width(&self) -> u16 { 0 }
 
-    fn format(&self, width: usize, evt: &ExtLogRecord) -> Vec<Line> {
+    fn format(&self, width: usize, evt: &ExtLogRecord) -> Vec<Line<'_>> {
         let color = match evt.level {
             log::Level::Trace => Color::Gray,
             log::Level::Debug => Color::LightBlue,
@@ -124,9 +124,6 @@ impl LogFormatter for MyLogFormatter {
             .collect()
     }
 }
-
-
-// -- snip previous imports --
 
 pub async fn main(mut interpreter: Interpreter, file: &Option<PathBuf>) -> Result<(), Box<dyn Error>> {
     tui_logger::init_logger(LevelFilter::Debug)?;

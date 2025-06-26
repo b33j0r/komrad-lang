@@ -58,7 +58,7 @@ impl CodeMap {
         }
     }
 
-    pub fn parser_span(&self) -> ParserSpan {
+    pub fn parser_span(&self) -> ParserSpan<'_> {
         LocatedSpan::new_extra(
             &self.source[..],
             Context {
@@ -93,7 +93,7 @@ impl CodeAtlas {
     }
 
     /// Adds a file from &str, stores it as Arc<String>, returns initial ParserSpan
-    pub fn add_file(&mut self, source: &str, file_path: Option<PathBuf>) -> ParserSpan {
+    pub fn add_file(&mut self, source: &str, file_path: Option<PathBuf>) -> ParserSpan<'_> {
         let file_id = self.next_file_id;
         self.next_file_id += 1;
 

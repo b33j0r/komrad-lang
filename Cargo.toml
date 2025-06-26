@@ -2,6 +2,8 @@
 name = "komrad-lang"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.90.0"
+
 
 [dependencies]
 tokio.workspace = true
