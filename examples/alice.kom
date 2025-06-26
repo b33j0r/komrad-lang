@@ -1,3 +1,5 @@
+import "bob"
+
 Alice = {
 	[start] {
 		Io println "Hello, I'm Alice."
