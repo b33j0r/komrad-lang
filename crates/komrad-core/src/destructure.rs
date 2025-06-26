@@ -108,8 +108,8 @@ fn evaluate_predicate(pred: &Predicate, input: &Value) -> Result<bool, RuntimeEr
             trace!("Predicate evaluated to: {:?}", b);
             Ok(b)
         }
-        _ => Err(RuntimeError::TypeError(
-            "Predicate did not evaluate to a boolean".to_string(),
+        _ => Err(RuntimeError::NotImplemented(
+            "Predicate only supports basic booleans".into(),
         )),
     }
 }

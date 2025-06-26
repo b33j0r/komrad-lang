@@ -111,4 +111,7 @@ pub enum RuntimeError {
 
     #[error("Channel error: {0}")]
     ChannelError(String),
+
+    #[error("Not implemented: {0}")]
+    NotImplemented(String),
 }
