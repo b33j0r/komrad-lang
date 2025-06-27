@@ -72,7 +72,7 @@ impl Interpreter {
 
         let mut env = Env::new(initial_bindings.clone(), initial_handlers);
 
-        let mut factory_registry: Arc<DashMap<String, Box<dyn AgentFactory + Send + Sync>>> = Arc::new(DashMap::new());
+        let factory_registry: Arc<DashMap<String, Box<dyn AgentFactory + Send + Sync>>> = Arc::new(DashMap::new());
 
         factory_registry.insert("HttpListener".to_string(), Box::new(HttpListenerFactory));
 

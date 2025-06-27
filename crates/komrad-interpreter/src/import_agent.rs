@@ -5,7 +5,7 @@ use komrad_macros::Agent;
 use komrad_parser::parse_toplevel::parse_file_complete;
 use std::collections::HashMap;
 use std::collections::HashSet;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::fs;
 
