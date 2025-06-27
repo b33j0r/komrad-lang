@@ -329,6 +329,8 @@ impl ToSExpr for Operator {
             Operator::NotEqual => "!=",
             Operator::GreaterThan => ">",
             Operator::LessThan => "<",
+            Operator::GreaterThanOrEqual => ">=",
+            Operator::LessThanOrEqual => "<=",
         };
         SExpr::Atom(op_str.to_string())
     }

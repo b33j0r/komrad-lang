@@ -23,7 +23,7 @@ pub fn evaluate_predicate(pred: &Predicate, input: &Value) -> Result<bool, Runti
 // In our case, any free variable (Predicate::Variable) is treated as the input value.
 pub fn eval_predicate_expr(pred: &Predicate, input: &Value) -> Result<Value, RuntimeError> {
     match pred {
-        Predicate::Value(val) => Ok(Value::Boolean(val == input)),
+        Predicate::Value(val) => Ok(val.clone()),
         Predicate::Variable(_) => Ok(input.clone()),
         Predicate::BinaryExpr { lhs, op, rhs } => {
             let left = eval_predicate_expr(&lhs.value, input)?;
@@ -109,6 +109,22 @@ pub fn apply_operator(lhs: &Value, op: &Operator, rhs: &Value) -> Result<Value, 
             (Float(a), Float(b)) => Ok(Boolean(a < b)),
             _ => Err(RuntimeError::TypeError("LessThan operator requires numeric operands".into())),
         },
+
+        Operator::GreaterThanOrEqual => match (lhs, rhs) {
+            (Int(a), Int(b)) => Ok(Boolean(a >= b)),
+            (Int(a), Float(b)) => Ok(Boolean((*a as f64) >= *b)),
+            (Float(a), Int(b)) => Ok(Boolean(*a >= (*b as f64))),
+            (Float(a), Float(b)) => Ok(Boolean(a >= b)),
+            _ => Err(RuntimeError::TypeError("GreaterThanOrEqual operator requires numeric operands".into())),
+        },
+
+        Operator::LessThanOrEqual => match (lhs, rhs) {
+            (Int(a), Int(b)) => Ok(Boolean(a <= b)),
+            (Int(a), Float(b)) => Ok(Boolean((*a as f64) <= *b)),
+            (Float(a), Int(b)) => Ok(Boolean(*a <= (*b as f64))),
+            (Float(a), Float(b)) => Ok(Boolean(a <= b)),
+            _ => Err(RuntimeError::TypeError("LessThanOrEqual operator requires numeric operands".into())),
+        },
     }
 }
 
@@ -145,5 +161,121 @@ mod tests {
         let pred = Predicate::BinaryExpr { lhs: spanned_var, op, rhs: spanned_three };
         assert_eq!(evaluate_predicate(&pred, &Value::Int(10)), Ok(true));
         assert_eq!(evaluate_predicate(&pred, &Value::Int(2)), Ok(false));
+    }
+
+    #[test]
+    fn test_greater_than_or_equal() {
+        // Test with integers
+        assert_eq!(
+            apply_operator(&Value::Int(5), &Operator::GreaterThanOrEqual, &Value::Int(5)),
+            Ok(Value::Boolean(true))
+        );
+        assert_eq!(
+            apply_operator(&Value::Int(6), &Operator::GreaterThanOrEqual, &Value::Int(5)),
+            Ok(Value::Boolean(true))
+        );
+        assert_eq!(
+            apply_operator(&Value::Int(4), &Operator::GreaterThanOrEqual, &Value::Int(5)),
+            Ok(Value::Boolean(false))
+        );
+
+        // Test with floats
+        assert_eq!(
+            apply_operator(&Value::Float(5.0), &Operator::GreaterThanOrEqual, &Value::Float(5.0)),
+            Ok(Value::Boolean(true))
+        );
+        assert_eq!(
+            apply_operator(&Value::Float(5.1), &Operator::GreaterThanOrEqual, &Value::Float(5.0)),
+            Ok(Value::Boolean(true))
+        );
+        assert_eq!(
+            apply_operator(&Value::Float(4.9), &Operator::GreaterThanOrEqual, &Value::Float(5.0)),
+            Ok(Value::Boolean(false))
+        );
+
+        // Test with mixed types
+        assert_eq!(
+            apply_operator(&Value::Int(5), &Operator::GreaterThanOrEqual, &Value::Float(5.0)),
+            Ok(Value::Boolean(true))
+        );
+        assert_eq!(
+            apply_operator(&Value::Float(5.0), &Operator::GreaterThanOrEqual, &Value::Int(5)),
+            Ok(Value::Boolean(true))
+        );
+    }
+
+    #[test]
+    fn test_less_than_or_equal() {
+        // Test with integers
+        assert_eq!(
+            apply_operator(&Value::Int(5), &Operator::LessThanOrEqual, &Value::Int(5)),
+            Ok(Value::Boolean(true))
+        );
+        assert_eq!(
+            apply_operator(&Value::Int(4), &Operator::LessThanOrEqual, &Value::Int(5)),
+            Ok(Value::Boolean(true))
+        );
+        assert_eq!(
+            apply_operator(&Value::Int(6), &Operator::LessThanOrEqual, &Value::Int(5)),
+            Ok(Value::Boolean(false))
+        );
+
+        // Test with floats
+        assert_eq!(
+            apply_operator(&Value::Float(5.0), &Operator::LessThanOrEqual, &Value::Float(5.0)),
+            Ok(Value::Boolean(true))
+        );
+        assert_eq!(
+            apply_operator(&Value::Float(4.9), &Operator::LessThanOrEqual, &Value::Float(5.0)),
+            Ok(Value::Boolean(true))
+        );
+        assert_eq!(
+            apply_operator(&Value::Float(5.1), &Operator::LessThanOrEqual, &Value::Float(5.0)),
+            Ok(Value::Boolean(false))
+        );
+
+        // Test with mixed types
+        assert_eq!(
+            apply_operator(&Value::Int(5), &Operator::LessThanOrEqual, &Value::Float(5.0)),
+            Ok(Value::Boolean(true))
+        );
+        assert_eq!(
+            apply_operator(&Value::Float(5.0), &Operator::LessThanOrEqual, &Value::Int(5)),
+            Ok(Value::Boolean(true))
+        );
+    }
+
+    #[test]
+    fn test_evaluate_predicate_with_greater_than_or_equal() {
+        let spanned_var = Spanned::new(dummy_span(), Predicate::Variable("x".into()));
+        let spanned_five = Spanned::new(dummy_span(), Predicate::Value(Value::Int(5)));
+        let op = Spanned::new(dummy_span(), Operator::GreaterThanOrEqual);
+        let pred = Predicate::BinaryExpr { lhs: spanned_var, op, rhs: spanned_five };
+
+        // Test with value greater than 5
+        assert_eq!(evaluate_predicate(&pred, &Value::Int(10)), Ok(true));
+
+        // Test with value equal to 5
+        assert_eq!(evaluate_predicate(&pred, &Value::Int(5)), Ok(true));
+
+        // Test with value less than 5
+        assert_eq!(evaluate_predicate(&pred, &Value::Int(3)), Ok(false));
+    }
+
+    #[test]
+    fn test_evaluate_predicate_with_less_than_or_equal() {
+        let spanned_var = Spanned::new(dummy_span(), Predicate::Variable("x".into()));
+        let spanned_five = Spanned::new(dummy_span(), Predicate::Value(Value::Int(5)));
+        let op = Spanned::new(dummy_span(), Operator::LessThanOrEqual);
+        let pred = Predicate::BinaryExpr { lhs: spanned_var, op, rhs: spanned_five };
+
+        // Test with value less than 5
+        assert_eq!(evaluate_predicate(&pred, &Value::Int(3)), Ok(true));
+
+        // Test with value equal to 5
+        assert_eq!(evaluate_predicate(&pred, &Value::Int(5)), Ok(true));
+
+        // Test with value greater than 5
+        assert_eq!(evaluate_predicate(&pred, &Value::Int(10)), Ok(false));
     }
 }

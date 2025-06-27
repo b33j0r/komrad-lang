@@ -179,6 +179,8 @@ pub enum Operator {
     NotEqual,
     GreaterThan,
     LessThan,
+    GreaterThanOrEqual,
+    LessThanOrEqual,
 }
 
 /// Represents the associativity of an operator.
@@ -211,7 +213,9 @@ impl Operator {
         match self {
             Add | Subtract => Associativity::Left,
             Mod | Multiply | Divide => Associativity::Left,
-            Equal | NotEqual | GreaterThan | LessThan => Associativity::None,
+            Equal | NotEqual | GreaterThan | LessThan | GreaterThanOrEqual | LessThanOrEqual => {
+                Associativity::None
+            }
         }
     }
 
@@ -225,7 +229,7 @@ impl Operator {
             Multiply | Divide => 2,
             Mod => 3,
             Equal | NotEqual => 4,
-            GreaterThan | LessThan => 5,
+            GreaterThan | LessThan | GreaterThanOrEqual | LessThanOrEqual => 5,
         }
     }
 }

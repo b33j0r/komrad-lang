@@ -609,6 +609,10 @@ fn parse_string_expr(input: ParserSpan) -> PResult<Spanned<Expr>> {
 fn parse_binary_operator(input: ParserSpan) -> IResult<ParserSpan, Spanned<Operator>, ParseError> {
     spanned::spanned(|i| {
         alt((
+            map(parse_tag(">="), |_| Operator::GreaterThanOrEqual),
+            map(parse_tag("<="), |_| Operator::LessThanOrEqual),
+            map(parse_tag(">"), |_| Operator::GreaterThan),
+            map(parse_tag("<"), |_| Operator::LessThan),
             map(parse_tag("+"), |_| Operator::Add),
             map(parse_tag("-"), |_| Operator::Subtract),
             map(parse_tag("*"), |_| Operator::Multiply),
@@ -616,8 +620,6 @@ fn parse_binary_operator(input: ParserSpan) -> IResult<ParserSpan, Spanned<Opera
             map(parse_tag("%"), |_| Operator::Mod),
             map(parse_tag("=="), |_| Operator::Equal),
             map(parse_tag("!="), |_| Operator::NotEqual),
-            map(parse_tag(">"), |_| Operator::GreaterThan),
-            map(parse_tag("<"), |_| Operator::LessThan),
         ))
             .parse(i)
     })
