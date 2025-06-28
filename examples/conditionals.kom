@@ -80,6 +80,8 @@ if (1 <= 2) {
 a = 5
 b = 10
 
+Io println "a = " + a + ", b = " + b
+
 # Test variable equality
 if (a == b) {
     Io println "a is equal to b."

@@ -34,16 +34,25 @@ pub enum InterpreterError {
 pub struct Interpreter {
     codemaps: CodeAtlas,
     env: Env,
+    features: InterpreterFeatures,
+}
+
+impl Interpreter {
+    pub fn features(&self) -> &InterpreterFeatures {
+        &self.features
+    }
 }
 
 pub struct InterpreterFeatures {
     pub io_uses_tracing: bool,
+    pub verbosity: tracing::Level,
 }
 
 impl Default for InterpreterFeatures {
     fn default() -> Self {
         Self {
             io_uses_tracing: false,
+            verbosity: tracing::Level::INFO,
         }
     }
 }
@@ -92,6 +101,7 @@ impl Interpreter {
         Self {
             env,
             codemaps: CodeAtlas::new(),
+            features,
         }
     }
 

@@ -7,6 +7,9 @@ use std::path::PathBuf;
 pub struct Args {
     #[command(subcommand)]
     pub command: Option<Command>,
+
+    #[command(flatten)]
+    verbosity: clap_verbosity_flag::Verbosity,
 }
 
 /// Your supported subcommands.
@@ -49,6 +52,7 @@ pub async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let features = komrad_interpreter::InterpreterFeatures {
         io_uses_tracing,
+        verbosity: args.verbosity.tracing_level().unwrap(),
         ..Default::default()
     };
 
