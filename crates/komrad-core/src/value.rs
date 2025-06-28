@@ -3,6 +3,7 @@ use crate::error::RuntimeError;
 use crate::{Block, Channel, Spanned};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde_json::{self, Value as JsonValue};
+use std::cmp::Ordering;
 use std::sync::Arc;
 
 #[derive(Debug, Clone)]
@@ -74,6 +75,91 @@ impl PartialEq for Value {
 
             // anything else (different variants)
             _ => false,
+        }
+    }
+}
+
+impl PartialOrd for Value {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        use Value::*;
+
+        // Fast path: identical variants that implement `PartialOrd` natively
+        match (self, other) {
+            (Null, Null) => return Some(Ordering::Equal),
+
+            (Boolean(a), Boolean(b)) => return a.partial_cmp(b),
+            (Int(a), Int(b)) => return a.partial_cmp(b),
+            (Float(a), Float(b)) => return a.partial_cmp(b),
+            (String(a), String(b)) => return a.partial_cmp(b),
+            (Word(a), Word(b)) => return a.partial_cmp(b),
+            (Uuid(a), Uuid(b)) => return a.as_bytes().partial_cmp(b.as_bytes()),
+            (Bytes(a), Bytes(b)) => return a.as_ref().partial_cmp(b.as_ref()),
+
+            // Python-style lexicographic ordering for lists.
+            //
+            // The comparison proceeds element-by-element.  The first pair
+            // that is not equal determines the result.  If all shared
+            // elements are equal, the shorter list is considered *less*.
+            (List(a), List(b)) => {
+                for (left, right) in a.iter().zip(b.iter()) {
+                    match left.partial_cmp(right) {
+                        Some(Ordering::Equal) => continue,
+                        non_eq => return non_eq,
+                    }
+                }
+                return a.len().partial_cmp(&b.len());
+            }
+
+            // Dictionaries are compared by iterating over their *sorted*
+            // key/value pairs, just like Python.
+            (Dict(a), Dict(b)) => {
+                let mut va: Vec<_> = a.iter().collect();
+                let mut vb: Vec<_> = b.iter().collect();
+                va.sort_by(|(ka, _), (kb, _)| ka.cmp(kb));
+                vb.sort_by(|(ka, _), (kb, _)| ka.cmp(kb));
+
+                for ((ka, va), (kb, vb)) in va.iter().zip(vb.iter()) {
+                    match ka.partial_cmp(kb) {
+                        Some(Ordering::Equal) => {}
+                        non_eq => return non_eq,
+                    }
+                    match va.partial_cmp(vb) {
+                        Some(Ordering::Equal) => {}
+                        non_eq => return non_eq,
+                    }
+                }
+                return va.len().partial_cmp(&vb.len());
+            }
+
+            // Everything else (errors, channels, blocks …) is intentionally
+            // *not* ordered – trying to compare them yields `None`.
+            (Error(_), Error(_))
+            | (Channel(_), Channel(_))
+            | (Block(_), Block(_))
+            | (RemoteError(_), RemoteError(_)) => return None,
+
+            // Different variants: fall back to a total ordering on the
+            // *variant*, so that maps/sets can still work.  This mirrors
+            // Python’s rule of comparing the type name when values differ.
+            _ => {
+                let rank = |v: &Value| match v {
+                    Null => 0,
+                    Boolean(_) => 1,
+                    Int(_) => 2,
+                    Float(_) => 3,
+                    Word(_) => 4,
+                    String(_) => 5,
+                    List(_) => 6,
+                    Dict(_) => 7,
+                    Uuid(_) => 8,
+                    Bytes(_) => 9,
+                    Channel(_) => 10,
+                    Block(_) => 11,
+                    Error(_) => 12,
+                    RemoteError(_) => 13,
+                };
+                return rank(self).partial_cmp(&rank(other));
+            }
         }
     }
 }

@@ -23,7 +23,10 @@ pub fn evaluate_predicate(pred: &Predicate, input: &Value) -> Result<bool, Runti
 // In our case, any free variable (Predicate::Variable) is treated as the input value.
 pub fn eval_predicate_expr(pred: &Predicate, input: &Value) -> Result<Value, RuntimeError> {
     match pred {
-        Predicate::Value(val) => Ok(val.clone()),
+        Predicate::Value(v) => {
+            let result = v == input;
+            Ok(Value::Boolean(result))
+        }
         Predicate::Variable(_) => Ok(input.clone()),
         Predicate::BinaryExpr { lhs, op, rhs } => {
             let left = eval_predicate_expr(&lhs.value, input)?;

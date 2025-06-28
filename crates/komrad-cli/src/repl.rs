@@ -126,7 +126,14 @@ impl LogFormatter for MyLogFormatter {
 }
 
 pub async fn main(mut interpreter: Interpreter, file: &Option<PathBuf>) -> Result<(), Box<dyn Error>> {
-    tui_logger::init_logger(LevelFilter::Debug)?;
+    let level_filter = match interpreter.features().verbosity {
+        tracing::Level::TRACE => LevelFilter::Trace,
+        tracing::Level::DEBUG => LevelFilter::Debug,
+        tracing::Level::INFO => LevelFilter::Info,
+        tracing::Level::WARN => LevelFilter::Warn,
+        tracing::Level::ERROR => LevelFilter::Error,
+    };
+    tui_logger::init_logger(level_filter)?;
     tracing::subscriber::set_global_default(Registry::default().with(TuiTracingSubscriberLayer))?;
 
     if let Some(file) = file {

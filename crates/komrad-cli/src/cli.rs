@@ -9,7 +9,7 @@ pub struct Args {
     pub command: Option<Command>,
 
     #[command(flatten)]
-    verbosity: clap_verbosity_flag::Verbosity,
+    verbosity: clap_verbosity_flag::Verbosity<clap_verbosity_flag::InfoLevel>,
 }
 
 /// Your supported subcommands.

@@ -2,6 +2,7 @@ use async_trait::async_trait;
 use komrad_core::{AgentLifecycle, Message, MessageHandler, Value};
 use komrad_macros::Agent;
 use std::convert::TryFrom;
+use std::io::Write;
 use std::sync::Arc;
 
 //
@@ -11,6 +12,7 @@ use std::sync::Arc;
 pub trait IoInterface {
     fn print(&self, message: &str);
     fn println(&self, message: &str);
+    fn flush(&self);
 }
 
 pub struct ConsoleIo;
@@ -21,6 +23,9 @@ impl IoInterface for ConsoleIo {
     fn println(&self, message: &str) {
         println!("{}", message);
     }
+    fn flush(&self) {
+        std::io::stdout().flush().unwrap();
+    }
 }
 
 pub struct TracingIo;
@@ -30,6 +35,9 @@ impl IoInterface for TracingIo {
     }
     fn println(&self, message: &str) {
         tracing::warn!("{}", message);
+    }
+    fn flush(&self) {
+        // Tracing does not require flushing like stdout.
     }
 }
 
@@ -58,6 +66,7 @@ impl Default for IoAgent {
 pub enum IoAgentMessage {
     Print(String),
     Println(String),
+    Flush,
 }
 
 /// Convert an incoming Message to an IoAgentMessage.
@@ -96,6 +105,10 @@ impl TryFrom<Message> for IoAgentMessage {
                         Err("println command requires a string argument".to_string())
                     }
                 }
+                "flush" => {
+                    // Flush does not require any arguments.
+                    Ok(IoAgentMessage::Flush)
+                }
                 _ => Err(format!("Unknown IoAgent command: {}", command)),
             }
         } else {
@@ -122,6 +135,10 @@ impl MessageHandler for IoAgent {
             }
             IoAgentMessage::Println(text) => {
                 self.io_interface.println(&text);
+                None
+            }
+            IoAgentMessage::Flush => {
+                self.io_interface.flush();
                 None
             }
         }

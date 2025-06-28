@@ -242,10 +242,18 @@ impl Evaluate for Spanned<Expr> {
                                 .as_spanned(rhs.span.clone()),
                         ),
                     },
-                    _ => Value::Error(
-                        RuntimeError::UnknownError("Operator not implemented".to_string())
-                            .as_spanned(op.span.clone()),
-                    ),
+                    Operator::GreaterThan => {
+                        Value::Boolean(left > right)
+                    }
+                    Operator::LessThan => {
+                        Value::Boolean(left < right)
+                    }
+                    Operator::GreaterThanOrEqual => {
+                        Value::Boolean(left >= right)
+                    }
+                    Operator::LessThanOrEqual => {
+                        Value::Boolean(left <= right)
+                    }
                 }
             }
             // Ask expression – send_and_recv.
