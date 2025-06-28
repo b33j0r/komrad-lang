@@ -1,16 +1,17 @@
 # Basic test for predicate-based conditionals in Komrad
 
 If = {
+    # Simple condition with no else
     [_(true) _{consequent}] {
         *consequent
     }
 
-    [_(false) _{consequent}] {}
-
+    # Condition with else clause
     [_(true) _{consequent} else _{alternative}] {
         *consequent
     }
 
+    # Condition for else clause
     [_(false) _{consequent} else _{alternative}] {
         *alternative
     }
@@ -54,7 +55,7 @@ if (1 == 1) {
 if (1 != 1) {
     Io println "FAIL: 1 is not equal to 1."
 } else {
-    Io println "PASS: 1 is not equal to 1."
+    Io println "PASS: 1 is equal to 1."
 }
 
 if (1 != 2) {
@@ -108,19 +109,46 @@ Io flush
 # Example
 
 Alice = {
-    [see you at _(x == 5)] {
-        Io println "PASS: Alice is happy to meet you at 5 o'clock"
+    [meet you at 5] {
+        Io println "PASS (1/4): Alice is happy to meet you at the exact value 5"
     }
-
+    [see you at _(x == 5)] {
+        Io println "PASS (2/4): Alice is happy to meet you at " + x
+    }
     [see you at _time] {
-        Io println "PASS: Alice only meets at 5 o'clock, not " + time
+        Io println "PASS (3/4): Alice only meets at 5 o'clock, not " + time
+    }
+    [how about meeting at _(x <= 4)] {
+        Io println "PASS (4/4): Alice does not meet as early as " + x
     }
 }
 
 alice = spawn Alice {}
 
-# Prints that alice is happy to meet at 5
+# Prints that (1/4) Alice is happy to meet you at the exact value 5
+alice meet you at 5
+
+# Prints that (2/4) Alice is happy to meet you at 5
 alice see you at 5
 
-# Prints that alice won't meet at 3
+# Prints that (3/4) Alice only meets at 5 o'clock, not 3
 alice see you at 3
+
+# Prints that (4/4) Alice does not meet as early as 4
+alice how about meeting at 4
+
+# Prints that (4/4) Alice does not meet as early as 3
+alice how about meeting at 3
+
+
+# Example of implicit equation solving
+Bob = {
+    [add two _(x - 2)] {
+        Io println "PASS: Bob adds two to " + (x - 2) + ", result is " + x
+    }
+}
+
+bob = spawn Bob {}
+
+# Prints that Bob adds two to 3, result is 5
+bob add two 3

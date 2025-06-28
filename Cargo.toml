@@ -9,9 +9,21 @@ rust-version = "1.90.0"
 tokio.workspace = true
 komrad-cli = { path = "crates/komrad-cli" }
 
+[dev-dependencies]
+# Include all workspace crates as dev-dependencies to ensure their tests are run
+komrad-core = { path = "crates/komrad-core" }
+komrad-parser = { path = "crates/komrad-parser" }
+komrad-interpreter = { path = "crates/komrad-interpreter" }
+komrad-macros = { path = "crates/komrad-macros" }
+komrad-web = { path = "crates/komrad-web" }
+
 [workspace]
 resolver = "3"
 members = [".", "crates/komrad-cli", "crates/komrad-core", "crates/komrad-interpreter", "crates/komrad-macros", "crates/komrad-parser", "crates/komrad-web"]
+
+[workspace.metadata]
+# This ensures that running `cargo test` in the root crate
+# recursively executes the tests in the workspace
 
 [workspace.dependencies]
 async-trait = "0.1.88"

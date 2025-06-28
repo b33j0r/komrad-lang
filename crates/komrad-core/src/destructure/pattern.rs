@@ -43,8 +43,12 @@ impl Destructure for PatternDestructure {
 
             // Match a predicate like _(x > 3)
             (Pattern::PredicateCapture(pred), value) => match evaluate_predicate(&pred.value, value) {
-                Ok(true) => DestructureResult::Match(bindings),
-                Ok(false) => DestructureResult::NoMatch,
+                Ok((true, pred_bindings)) => {
+                    // Add the bindings from the predicate evaluation
+                    bindings.extend(pred_bindings);
+                    DestructureResult::Match(bindings)
+                },
+                Ok((false, _)) => DestructureResult::NoMatch,
                 Err(e) => DestructureResult::Err(e),
             },
 
@@ -119,7 +123,13 @@ mod tests {
         let op = Spanned::new(dummy_span(), Operator::GreaterThan);
         let pred = Spanned::new(dummy_span(), Predicate::BinaryExpr { lhs: spanned_var, op, rhs: spanned_five });
         let pattern = Pattern::PredicateCapture(pred);
-        assert_eq!(PatternDestructure::destructure(&pattern, &Value::Int(10)), DestructureResult::Match(HashMap::new()));
+
+        // For value 10, the predicate x > 5 is true, and x should be bound to 10
+        let mut expected_bindings_10 = HashMap::new();
+        expected_bindings_10.insert("x".to_string(), Value::Int(10));
+        assert_eq!(PatternDestructure::destructure(&pattern, &Value::Int(10)), DestructureResult::Match(expected_bindings_10));
+
+        // For value 3, the predicate x > 5 is false
         assert_eq!(PatternDestructure::destructure(&pattern, &Value::Int(3)), DestructureResult::NoMatch);
     }
 }

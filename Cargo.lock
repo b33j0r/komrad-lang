@@ -1266,6 +1266,11 @@ name = "komrad-lang"
 version = "0.1.0"
 dependencies = [
  "komrad-cli",
+ "komrad-core",
+ "komrad-interpreter",
+ "komrad-macros",
+ "komrad-parser",
+ "komrad-web",
  "tokio",
 ]
 
