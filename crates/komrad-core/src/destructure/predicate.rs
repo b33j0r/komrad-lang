@@ -24,9 +24,15 @@ pub fn evaluate_predicate(pred: &Predicate, input: &Value) -> Result<bool, Runti
 pub fn eval_predicate_expr(pred: &Predicate, input: &Value) -> Result<Value, RuntimeError> {
     match pred {
         Predicate::Value(v) => {
-            let result = v == input;
-            Ok(Value::Boolean(result))
-        }
+            // Special case for boolean literals in predicates
+            if let Value::Boolean(_) = v {
+                let result = v == input;
+                Ok(Value::Boolean(result))
+            } else {
+                // For non-boolean literals, just return the value
+                Ok(v.clone())
+            }
+        },
         Predicate::Variable(_) => Ok(input.clone()),
         Predicate::BinaryExpr { lhs, op, rhs } => {
             let left = eval_predicate_expr(&lhs.value, input)?;

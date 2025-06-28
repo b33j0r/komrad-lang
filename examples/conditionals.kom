@@ -103,3 +103,24 @@ if (a < b) {
 }
 
 Io flush
+
+
+# Example
+
+Alice = {
+    [see you at _(x == 5)] {
+        Io println "PASS: Alice is happy to meet you at 5 o'clock"
+    }
+
+    [see you at _time] {
+        Io println "PASS: Alice only meets at 5 o'clock, not " + time
+    }
+}
+
+alice = spawn Alice {}
+
+# Prints that alice is happy to meet at 5
+alice see you at 5
+
+# Prints that alice won't meet at 3
+alice see you at 3

@@ -644,11 +644,57 @@ fn parse_bool_value(
 fn parse_predicate(
     input: ParserSpan,
 ) -> PResult<Spanned<komrad_core::Predicate>> {
+    parse_predicate_expression(0).parse(input)
+}
+
+fn parse_predicate_expression(
+    min_prec: u8,
+) -> impl FnMut(ParserSpan) -> PResult<Spanned<komrad_core::Predicate>> {
+    move |mut input| {
+        let (i2, mut lhs) = parse_predicate_term.parse(input)?;
+        input = i2;
+
+        loop {
+            // see if next token is an operator of sufficient precedence
+            let op_res = delimited(multispace0, parse_binary_operator, multispace0).parse(input.clone());
+            match op_res {
+                Ok((i3, op)) => {
+                    let prec = op.precedence();
+                    if prec < min_prec {
+                        break;
+                    }
+                    let next_min = match op.associativity() {
+                        Associativity::Left => prec + 1,
+                        Associativity::Right => prec,
+                        Associativity::None => prec,
+                    };
+                    let (i4, rhs) = parse_predicate_expression(next_min).parse(i3)?;
+                    lhs = komrad_core::Predicate::BinaryExpr {
+                        lhs: lhs.clone(),
+                        op,
+                        rhs: rhs.clone(),
+                    }
+                        .as_spanned(Span {
+                            file_id: lhs.span.file_id,
+                            start: lhs.span.start,
+                            end: rhs.span.end,
+                        });
+                    input = i4;
+                }
+                Err(_) => break,
+            }
+        }
+        Ok((input, lhs))
+    }
+}
+
+fn parse_predicate_term(input: ParserSpan) -> PResult<Spanned<komrad_core::Predicate>> {
     spanned::spanned(|i| {
-        parse_bool_value
-            .map(
-                |v| komrad_core::Predicate::Value(*v.value.clone()),
-            )
+        alt((
+            parse_bool_value.map(|v| komrad_core::Predicate::Value(*v.value.clone())),
+            parse_number_value.map(|v| komrad_core::Predicate::Value(*v.value.clone())),
+            parse_identifier.map(komrad_core::Predicate::Variable),
+        ))
             .parse(i)
     })
         .parse(input)
