@@ -45,19 +45,19 @@ traditional `if` statement, but instead uses a pattern matching construct that c
 
 ```komrad
 If = {
-	[_(true) _{consequent}] {
-		*consequent
-	}
+    [_(true) _{consequent}] {
+        *consequent
+    }
 
-	[_(false) _{consequent}] {}
+    [_(false) _{consequent}] {}
 
-	[_(true) _{consequent} else _{alternative}] {
-		*consequent
-	}
+    [_(true) _{consequent} else _{alternative}] {
+        *consequent
+    }
 
-	[_(false) _{consequent} else _{alternative}] {
-		*alternative
-	}
+    [_(false) _{consequent} else _{alternative}] {
+        *alternative
+    }
 }
 
 if = spawn If {}

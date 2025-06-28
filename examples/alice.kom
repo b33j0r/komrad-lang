@@ -1,9 +1,9 @@
 import "bob"
 
 Alice = {
-	[start] {
-		Io println "Hello, I'm Alice."
-	}
+    [start] {
+        Io println "Hello, I'm Alice."
+    }
 }
 
 alice = spawn Alice

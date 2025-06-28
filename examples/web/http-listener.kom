@@ -1,53 +1,53 @@
 Server = {
-	host = "localhost"
-	port = 8080
-	listener = null
-	count = 0
+    host = "localhost"
+    port = 8080
+    listener = null
+    count = 0
 
-	[start] {
-	    listener = spawn HttpListener {
-        	host: host,
-        	port: port,
-        	delegate: server
+    [start] {
+        listener = spawn HttpListener {
+            host: host,
+            port: port,
+            delegate: server
         }
         Io println "Server started on http://" + host + ":" + port
-	}
+    }
 
-	[http _request _response GET] {
-		Io println "GET /"
-		response template "examples/web/templates/counter.html" {
-			title: "Komrad",
-			count: count
-		}
-	}
+    [http _request _response GET] {
+        Io println "GET /"
+        response template "examples/web/templates/counter.html" {
+            title: "Komrad",
+            count: count
+        }
+    }
 
-	[http _request _response GET "favicon.ico"] {
-		response file "examples/web/static/tape.ico"
-	}
+    [http _request _response GET "favicon.ico"] {
+        response file "examples/web/static/tape.ico"
+    }
 
-	[http _request _response GET "static" _filename] {
-		Io println "GET /static/" + filename
-		response file "examples/web/static/" + filename
-	}
+    [http _request _response GET "static" _filename] {
+        Io println "GET /static/" + filename
+        response file "examples/web/static/" + filename
+    }
 
-	[http _request _response POST "increment"] {
-		count = count + 1
-		response redirect "/"
-	}
+    [http _request _response POST "increment"] {
+        count = count + 1
+        response redirect "/"
+    }
 
-	[http _request _response POST "decrement"] {
-		count = count - 1
-		response redirect "/"
-	}
+    [http _request _response POST "decrement"] {
+        count = count - 1
+        response redirect "/"
+    }
 
-	[http _request _response GET "json" _number] {
-		response json {
-			number: number
-		}
-	}
+    [http _request _response GET "json" _number] {
+        response json {
+            number: number
+        }
+    }
 }
 
 server = spawn Server {
-	host: "0.0.0.0",
-	port: 8086
+    host: "0.0.0.0",
+    port: 8086
 }
