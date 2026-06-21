@@ -3,10 +3,10 @@ examples_dir = "./examples"
 [[parsers.komrad]]
 adapter = "nom"
 grammar_files = ["./crates/komrad-parser/src/**/*.rs", "./crates/komrad-core/src/ast.rs"]
-highlight_captures = { comment = "comment", symbol = "variable", string = "string", number = "number", keyword = "keyword", operator = "operator" }
+highlight_captures = { comment = "comment", symbol = "variable", handler = "handler", "capture.variable" = "capture.variable", "capture.block" = "capture.block", "predicate.variable" = "predicate.variable", "predicate.operator" = "predicate.operator", "predicate.keyword" = "keyword", "predicate.string" = "string", "predicate.number" = "number", string = "string", number = "number", keyword = "keyword", operator = "operator", "punctuation.delimiter" = "delimiter", "punctuation.bracket" = "bracket" }
 
 [parsers.komrad.build]
-command = "cargo build -p komrad-parser-palimpsest --target wasm32-unknown-unknown && wasm-bindgen --target web --out-dir target/palimpsest/komrad --out-name parser target/wasm32-unknown-unknown/debug/komrad_parser_palimpsest.wasm"
+command = "cargo build -p komrad-highlighter --target wasm32-unknown-unknown && wasm-bindgen --target web --out-dir target/palimpsest/komrad --out-name parser target/wasm32-unknown-unknown/debug/komrad_highlighter.wasm"
 outputs = ["./target/palimpsest/komrad/parser.js", "./target/palimpsest/komrad/parser_bg.wasm"]
 
 [parsers.komrad.runtime]
@@ -16,4 +16,4 @@ parse_export = "parse_to_json"
 [[filetypes.komrad]]
 extensions = ["*.kom", "*.komrad", "*.krd"]
 parser = "komrad"
-highlight_captures = { comment = "comment", symbol = "variable", string = "string", number = "number", keyword = "keyword", operator = "operator" }
+highlight_captures = { comment = "comment", symbol = "variable", handler = "handler", "capture.variable" = "capture.variable", "capture.block" = "capture.block", "predicate.variable" = "predicate.variable", "predicate.operator" = "predicate.operator", "predicate.keyword" = "keyword", "predicate.string" = "string", "predicate.number" = "number", string = "string", number = "number", keyword = "keyword", operator = "operator", "punctuation.delimiter" = "delimiter", "punctuation.bracket" = "bracket" }

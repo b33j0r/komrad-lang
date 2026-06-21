@@ -115,6 +115,24 @@ cargo run -- repl examples/web/websockets.kom
 
 ![REPL](/docs/repl-screenshot-2025-04-21-001.png?raw=true)
 
+## Palimpsest Workbench
+
+Komrad includes a `palimpsest.toml` for the Palimpsest grammar workbench. Install Palimpsest as a Python tool from GitHub, then run it from this repository:
+
+```bash
+uv tool install git+https://github.com/b33j0r/palimpsest.git
+cd /Users/brian/Projects/komrad-lang
+palimpsest
+```
+
+Open `http://127.0.0.1:5000`. The left pane opens Komrad examples, and the right pane opens the parser source. Use `Build komrad` in the grammar pane to compile `komrad-highlighter` to WebAssembly and load richer syntax highlighting for `.kom` files.
+
+For local Palimpsest development, install the local checkout instead:
+
+```bash
+uv tool install --editable /Users/brian/Projects/palimpsest
+```
+
 ### Tests
 
 To run the regression tests (golden tests) for the parser, use the following command:

@@ -19,7 +19,7 @@ komrad-web = { path = "crates/komrad-web" }
 
 [workspace]
 resolver = "3"
-members = [".", "crates/komrad-cli", "crates/komrad-core", "crates/komrad-interpreter", "crates/komrad-macros", "crates/komrad-parser", "crates/komrad-parser-palimpsest", "crates/komrad-web"]
+members = [".", "crates/komrad-cli", "crates/komrad-core", "crates/komrad-highlighter", "crates/komrad-interpreter", "crates/komrad-macros", "crates/komrad-parser", "crates/komrad-web"]
 
 [workspace.metadata]
 # This ensures that running `cargo test` in the root crate

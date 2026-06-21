@@ -1246,6 +1246,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "komrad-highlighter"
+version = "0.1.0"
+dependencies = [
+ "komrad-core",
+ "komrad-parser",
+ "palimpsest",
+ "serde_json",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "komrad-interpreter"
 version = "0.1.0"
 dependencies = [
@@ -1303,17 +1314,6 @@ dependencies = [
  "thiserror 2.0.12",
  "tracing",
  "tracing-subscriber",
-]
-
-[[package]]
-name = "komrad-parser-palimpsest"
-version = "0.1.0"
-dependencies = [
- "komrad-core",
- "komrad-parser",
- "palimpsest",
- "serde_json",
- "wasm-bindgen",
 ]
 
 [[package]]
@@ -1594,6 +1594,7 @@ dependencies = [
 [[package]]
 name = "palimpsest"
 version = "0.1.0"
+source = "git+https://github.com/b33j0r/palimpsest.git#0e0994ae787fd989092abc17faead66f800ebdcf"
 dependencies = [
  "pest",
  "serde",

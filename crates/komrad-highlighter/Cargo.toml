@@ -1,5 +1,5 @@
 [package]
-name = "komrad-parser-palimpsest"
+name = "komrad-highlighter"
 version = "0.1.0"
 edition = "2024"
 
@@ -9,7 +9,7 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 komrad-core = { path = "../komrad-core" }
 komrad-parser = { path = "../komrad-parser" }
-palimpsest = { path = "../../../palimpsest/crates/palimpsest" }
+palimpsest = { git = "https://github.com/b33j0r/palimpsest.git", package = "palimpsest" }
 wasm-bindgen = "0.2.105"
 
 [dev-dependencies]
