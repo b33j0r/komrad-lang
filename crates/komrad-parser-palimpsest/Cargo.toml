@@ -1,0 +1,16 @@
+[package]
+name = "komrad-parser-palimpsest"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+komrad-core = { path = "../komrad-core" }
+komrad-parser = { path = "../komrad-parser" }
+palimpsest = { path = "../../../palimpsest/crates/palimpsest" }
+wasm-bindgen = "0.2.105"
+
+[dev-dependencies]
+serde_json = "1.0.150"
