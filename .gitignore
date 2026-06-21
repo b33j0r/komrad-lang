@@ -7,8 +7,5 @@
 # Rust
 target/
 
-
-
-# Added by cargo
-
-/target
+# Zig
+.zig-cache/
