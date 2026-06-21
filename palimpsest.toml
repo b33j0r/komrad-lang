@@ -24,11 +24,10 @@ grammar_files = ["./crates/komrad-parser/src/**/*.rs", "./crates/komrad-core/src
 highlight_captures = "komrad"
 
 [parsers.komrad.build]
-command = "cargo build -p komrad-highlighter --target wasm32-unknown-unknown && wasm-bindgen --target web --out-dir target/palimpsest/komrad --out-name parser target/wasm32-unknown-unknown/debug/komrad_highlighter.wasm"
-outputs = ["./target/palimpsest/komrad/parser.js", "./target/palimpsest/komrad/parser_bg.wasm"]
+preset = "cargo-wasm-bindgen"
+package = "komrad-highlighter"
 
 [parsers.komrad.runtime]
-module = "./target/palimpsest/komrad/parser.js"
 parse_export = "parse_to_json"
 
 [[filetypes.komrad]]
