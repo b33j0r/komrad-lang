@@ -3,7 +3,7 @@ use komrad_core::{
     TopLevel, Value,
 };
 use komrad_parser::parse_toplevel::parse_file_complete;
-use palimpsest::{HighlightToken, parse_error_json, parse_success_json, token_from_byte_range};
+use palimpsest::{HighlightToken, TokenSink, parse_error_json, parse_success_json};
 use wasm_bindgen::prelude::wasm_bindgen;
 
 pub fn parse_tokens(source: &str) -> Result<Vec<HighlightToken>, String> {
@@ -11,11 +11,10 @@ pub fn parse_tokens(source: &str) -> Result<Vec<HighlightToken>, String> {
     let top_level =
         parse_file_complete(&mut codemaps, source, None).map_err(|error| error.to_string())?;
 
-    let mut tokens = Vec::new();
-    collect_top_level(source, &top_level, &mut tokens);
-    collect_handler_syntax(source, &mut tokens);
-    sort_and_dedupe(&mut tokens);
-    Ok(tokens)
+    let mut tokens = TokenSink::new(source);
+    collect_top_level(&top_level, &mut tokens);
+    collect_handler_syntax(&mut tokens);
+    Ok(tokens.into_tokens())
 }
 
 pub fn parse_tokens_json(source: &str) -> String {
@@ -30,110 +29,102 @@ pub fn parse_to_json(source: &str) -> String {
     parse_tokens_json(source)
 }
 
-fn collect_top_level(source: &str, top_level: &TopLevel, tokens: &mut Vec<HighlightToken>) {
+fn collect_top_level(top_level: &TopLevel, tokens: &mut TokenSink<'_>) {
     match top_level {
-        TopLevel::Statement(statement) => collect_statement(source, statement, tokens),
-        TopLevel::Block(block) => collect_block(source, block, tokens),
+        TopLevel::Statement(statement) => collect_statement(statement, tokens),
+        TopLevel::Block(block) => collect_block(block, tokens),
     }
 }
 
-fn collect_block(source: &str, block: &Block, tokens: &mut Vec<HighlightToken>) {
+fn collect_block(block: &Block, tokens: &mut TokenSink<'_>) {
     for statement in &block.0 {
-        collect_statement(source, statement, tokens);
+        collect_statement(statement, tokens);
     }
 }
 
-fn collect_statement(
-    source: &str,
-    statement: &Spanned<Statement>,
-    tokens: &mut Vec<HighlightToken>,
-) {
+fn collect_statement(statement: &Spanned<Statement>, tokens: &mut TokenSink<'_>) {
     match &*statement.value {
         Statement::BlankLine | Statement::InvalidBlock => {}
-        Statement::Comment(_) => push_span(source, "comment", &statement.span, tokens),
-        Statement::Expr(expr) => collect_expr(source, expr, tokens),
+        Statement::Comment(_) => push_span("comment", &statement.span, tokens),
+        Statement::Expr(expr) => collect_expr(expr, tokens),
         Statement::Assign { target, value } => {
-            collect_assignment_target(source, target, tokens);
-            push_assignment_operator(source, &target.span, &value.span, tokens);
-            collect_expr(source, value, tokens);
+            collect_assignment_target(target, tokens);
+            push_assignment_operator(&target.span, &value.span, tokens);
+            collect_expr(value, tokens);
         }
         Statement::Tell { target, value } => {
-            collect_expr(source, target, tokens);
-            collect_expr(source, value, tokens);
+            collect_expr(target, tokens);
+            collect_expr(value, tokens);
         }
         Statement::Handler(handler) => {
-            push_handler_delimiters(source, &statement.span, &handler.pattern.span, tokens);
-            collect_handler_pattern(source, &handler.pattern, tokens);
-            push_block_braces(source, &handler.expr.span, tokens);
-            collect_expr(source, &handler.expr, tokens);
+            push_handler_delimiters(&statement.span, &handler.pattern.span, tokens);
+            collect_handler_pattern(&handler.pattern, tokens);
+            push_block_braces(&handler.expr.span, tokens);
+            collect_expr(&handler.expr, tokens);
         }
     }
 }
 
-fn collect_assignment_target(
-    source: &str,
-    target: &Spanned<AssignmentTarget>,
-    tokens: &mut Vec<HighlightToken>,
-) {
+fn collect_assignment_target(target: &Spanned<AssignmentTarget>, tokens: &mut TokenSink<'_>) {
     match &*target.value {
-        AssignmentTarget::Variable(_) => push_span(source, "symbol", &target.span, tokens),
+        AssignmentTarget::Variable(_) => push_span("symbol", &target.span, tokens),
         AssignmentTarget::Slice { target, index } => {
-            collect_assignment_target(source, target, tokens);
-            collect_expr(source, index, tokens);
+            collect_assignment_target(target, tokens);
+            collect_expr(index, tokens);
         }
         AssignmentTarget::List { elements } => {
             for element in elements {
-                collect_assignment_target(source, element, tokens);
+                collect_assignment_target(element, tokens);
             }
         }
     }
 }
 
-fn collect_expr(source: &str, expr: &Spanned<Expr>, tokens: &mut Vec<HighlightToken>) {
+fn collect_expr(expr: &Spanned<Expr>, tokens: &mut TokenSink<'_>) {
     match &*expr.value {
-        Expr::Value(value) => collect_value(source, value, tokens),
+        Expr::Value(value) => collect_value(value, tokens),
         Expr::Ask { target, value } => {
-            collect_expr(source, target, tokens);
-            collect_expr(source, value, tokens);
+            collect_expr(target, tokens);
+            collect_expr(value, tokens);
         }
         Expr::List { elements } => {
             for element in elements {
-                collect_expr(source, element, tokens);
+                collect_expr(element, tokens);
             }
         }
         Expr::Dict { index_map } => {
             for value in index_map.values() {
-                collect_expr(source, value, tokens);
+                collect_expr(value, tokens);
             }
         }
         Expr::BinaryExpr { lhs, op, rhs } => {
-            collect_expr(source, lhs, tokens);
-            collect_operator(source, op, tokens);
-            collect_expr(source, rhs, tokens);
+            collect_expr(lhs, tokens);
+            collect_operator(op, tokens);
+            collect_expr(rhs, tokens);
         }
         Expr::SliceExpr { target, index } => {
-            collect_expr(source, target, tokens);
-            collect_expr(source, index, tokens);
+            collect_expr(target, tokens);
+            collect_expr(index, tokens);
         }
-        Expr::Expander { target } => collect_expr(source, target, tokens),
+        Expr::Expander { target } => collect_expr(target, tokens),
     }
 }
 
-fn collect_value(source: &str, value: &Spanned<Value>, tokens: &mut Vec<HighlightToken>) {
+fn collect_value(value: &Spanned<Value>, tokens: &mut TokenSink<'_>) {
     match &*value.value {
-        Value::Word(_) => push_span(source, "symbol", &value.span, tokens),
-        Value::Boolean(_) => push_span(source, "keyword", &value.span, tokens),
-        Value::String(_) => push_span(source, "string", &value.span, tokens),
-        Value::Int(_) | Value::Float(_) => push_span(source, "number", &value.span, tokens),
-        Value::Block(block) => collect_block(source, block, tokens),
+        Value::Word(_) => push_span("symbol", &value.span, tokens),
+        Value::Boolean(_) => push_span("keyword", &value.span, tokens),
+        Value::String(_) => push_span("string", &value.span, tokens),
+        Value::Int(_) | Value::Float(_) => push_span("number", &value.span, tokens),
+        Value::Block(block) => collect_block(block, tokens),
         Value::List(values) => {
             for value in values {
-                collect_unspanned_value(source, value, tokens);
+                collect_unspanned_value(value, tokens);
             }
         }
         Value::Dict(dict) => {
             for value in dict.values() {
-                collect_unspanned_value(source, value, tokens);
+                collect_unspanned_value(value, tokens);
             }
         }
         Value::Null
@@ -145,9 +136,10 @@ fn collect_value(source: &str, value: &Spanned<Value>, tokens: &mut Vec<Highligh
     }
 }
 
-fn collect_unspanned_value(_source: &str, _value: &Value, _tokens: &mut Vec<HighlightToken>) {}
+fn collect_unspanned_value(_value: &Value, _tokens: &mut TokenSink<'_>) {}
 
-fn collect_handler_syntax(source: &str, tokens: &mut Vec<HighlightToken>) {
+fn collect_handler_syntax(tokens: &mut TokenSink<'_>) {
+    let source = tokens.source();
     let bytes = source.as_bytes();
     let mut index = 0;
 
@@ -169,36 +161,20 @@ fn collect_handler_syntax(source: &str, tokens: &mut Vec<HighlightToken>) {
             continue;
         }
 
-        push_range(source, "punctuation.bracket", index, index + 1, tokens);
-        collect_handler_pattern_text(source, index + 1, close, tokens);
-        push_range(source, "punctuation.bracket", close, close + 1, tokens);
-        push_range(
-            source,
-            "punctuation.bracket",
-            after_close,
-            after_close + 1,
-            tokens,
-        );
+        tokens.push_range("punctuation.bracket", index, index + 1);
+        collect_handler_pattern_text(index + 1, close, tokens);
+        tokens.push_range("punctuation.bracket", close, close + 1);
+        tokens.push_range("punctuation.bracket", after_close, after_close + 1);
         if let Some(close_brace) = matching_close_brace(source, after_close) {
-            push_range(
-                source,
-                "punctuation.bracket",
-                close_brace,
-                close_brace + 1,
-                tokens,
-            );
+            tokens.push_range("punctuation.bracket", close_brace, close_brace + 1);
         }
 
         index = close + 1;
     }
 }
 
-fn collect_handler_pattern_text(
-    source: &str,
-    start: usize,
-    end: usize,
-    tokens: &mut Vec<HighlightToken>,
-) {
+fn collect_handler_pattern_text(start: usize, end: usize, tokens: &mut TokenSink<'_>) {
+    let source = tokens.source();
     let mut index = start;
     while index < end {
         index = skip_ascii_whitespace_until(source, index, end);
@@ -213,10 +189,10 @@ fn collect_handler_pattern_text(
             else {
                 break;
             };
-            push_range(source, "punctuation.delimiter", index, index + 1, tokens);
-            push_range(source, "punctuation.bracket", index + 1, index + 2, tokens);
-            push_range(source, "capture.block", index + 2, close, tokens);
-            push_range(source, "punctuation.bracket", close, close + 1, tokens);
+            tokens.push_range("punctuation.delimiter", index, index + 1);
+            tokens.push_range("punctuation.bracket", index + 1, index + 2);
+            tokens.push_range("capture.block", index + 2, close);
+            tokens.push_range("punctuation.bracket", close, close + 1);
             index = close + 1;
             continue;
         }
@@ -228,10 +204,10 @@ fn collect_handler_pattern_text(
             else {
                 break;
             };
-            push_range(source, "punctuation.delimiter", index, index + 1, tokens);
-            push_range(source, "punctuation.bracket", index + 1, index + 2, tokens);
-            collect_predicate_text(source, index + 2, close, tokens);
-            push_range(source, "punctuation.bracket", close, close + 1, tokens);
+            tokens.push_range("punctuation.delimiter", index, index + 1);
+            tokens.push_range("punctuation.bracket", index + 1, index + 2);
+            collect_predicate_text(index + 2, close, tokens);
+            tokens.push_range("punctuation.bracket", close, close + 1);
             index = close + 1;
             continue;
         }
@@ -240,25 +216,21 @@ fn collect_handler_pattern_text(
             let name_start = index + 1;
             let name_end = identifier_end(source, name_start, end);
             if name_end > name_start {
-                push_range(source, "punctuation.delimiter", index, index + 1, tokens);
-                push_range(source, "capture.variable", name_start, name_end, tokens);
+                tokens.push_range("punctuation.delimiter", index, index + 1);
+                tokens.push_range("capture.variable", name_start, name_end);
                 index = name_end;
                 continue;
             }
         }
 
         let token_end = pattern_token_end(source, index, end);
-        collect_handler_atom_text(source, index, token_end, tokens);
+        collect_handler_atom_text(index, token_end, tokens);
         index = token_end;
     }
 }
 
-fn collect_predicate_text(
-    source: &str,
-    start: usize,
-    end: usize,
-    tokens: &mut Vec<HighlightToken>,
-) {
+fn collect_predicate_text(start: usize, end: usize, tokens: &mut TokenSink<'_>) {
+    let source = tokens.source();
     let mut index = start;
     while index < end {
         index = skip_ascii_whitespace_until(source, index, end);
@@ -269,7 +241,7 @@ fn collect_predicate_text(
         let byte = source.as_bytes()[index];
         if byte.is_ascii_digit() {
             let token_end = number_end(source, index, end);
-            push_range(source, "predicate.number", index, token_end, tokens);
+            tokens.push_range("predicate.number", index, token_end);
             index = token_end;
         } else if byte.is_ascii_alphabetic() || byte == b'_' {
             let token_end = identifier_end(source, index, end);
@@ -277,18 +249,18 @@ fn collect_predicate_text(
                 "true" | "false" => "predicate.keyword",
                 _ => "predicate.variable",
             };
-            push_range(source, capture, index, token_end, tokens);
+            tokens.push_range(capture, index, token_end);
             index = token_end;
         } else if matches!(
             byte,
             b'>' | b'<' | b'=' | b'!' | b'+' | b'-' | b'*' | b'/' | b'%'
         ) {
             let token_end = operator_end(source, index, end);
-            push_range(source, "predicate.operator", index, token_end, tokens);
+            tokens.push_range("predicate.operator", index, token_end);
             index = token_end;
         } else if matches!(byte, b'\'' | b'"') {
             let token_end = quoted_string_end(source, index, end);
-            push_range(source, "predicate.string", index, token_end, tokens);
+            tokens.push_range("predicate.string", index, token_end);
             index = token_end;
         } else {
             index += 1;
@@ -296,179 +268,131 @@ fn collect_predicate_text(
     }
 }
 
-fn collect_handler_atom_text(
-    source: &str,
-    start: usize,
-    end: usize,
-    tokens: &mut Vec<HighlightToken>,
-) {
+fn collect_handler_atom_text(start: usize, end: usize, tokens: &mut TokenSink<'_>) {
     if start >= end {
         return;
     }
 
+    let source = tokens.source();
     let token = &source[start..end];
     if token.as_bytes()[0].is_ascii_digit() {
-        push_range(source, "number", start, end, tokens);
+        tokens.push_range("number", start, end);
     } else if matches!(token, "true" | "false") {
-        push_range(source, "keyword", start, end, tokens);
+        tokens.push_range("keyword", start, end);
     } else if token.starts_with('"') || token.starts_with('\'') {
-        push_range(source, "string", start, end, tokens);
+        tokens.push_range("string", start, end);
     } else {
-        push_range(source, "handler", start, end, tokens);
+        tokens.push_range("handler", start, end);
     }
 }
 
-fn collect_handler_pattern(
-    source: &str,
-    pattern: &Spanned<Pattern>,
-    tokens: &mut Vec<HighlightToken>,
-) {
+fn collect_handler_pattern(pattern: &Spanned<Pattern>, tokens: &mut TokenSink<'_>) {
     match &*pattern.value {
-        Pattern::ValueMatch(value) => collect_handler_pattern_value(source, value, tokens),
+        Pattern::ValueMatch(value) => collect_handler_pattern_value(value, tokens),
         Pattern::VariableCapture(name) => {
-            push_capture_prefix(source, &name.span, tokens);
-            push_capture_name(source, "capture.variable", &name.span, tokens);
+            push_capture_prefix(&name.span, tokens);
+            push_capture_name("capture.variable", &name.span, tokens);
         }
         Pattern::BlockCapture(name) => {
-            push_block_capture_delimiters(source, &name.span, tokens);
-            push_capture_name(source, "capture.block", &name.span, tokens);
+            push_block_capture_delimiters(&name.span, tokens);
+            push_capture_name("capture.block", &name.span, tokens);
         }
         Pattern::PredicateCapture(predicate) => {
-            push_predicate_capture_delimiters(source, &predicate.span, tokens);
-            collect_predicate(source, predicate, tokens);
+            push_predicate_capture_delimiters(&predicate.span, tokens);
+            collect_predicate(predicate, tokens);
         }
         Pattern::List(patterns) => {
             for pattern in patterns {
-                collect_handler_pattern(source, pattern, tokens);
+                collect_handler_pattern(pattern, tokens);
             }
         }
     }
 }
 
-fn collect_handler_pattern_value(
-    source: &str,
-    value: &Spanned<Value>,
-    tokens: &mut Vec<HighlightToken>,
-) {
+fn collect_handler_pattern_value(value: &Spanned<Value>, tokens: &mut TokenSink<'_>) {
     match &*value.value {
-        Value::Word(_) => push_span(source, "handler", &value.span, tokens),
-        Value::Boolean(_) => push_span(source, "keyword", &value.span, tokens),
-        Value::String(_) => push_span(source, "string", &value.span, tokens),
-        Value::Int(_) | Value::Float(_) => push_span(source, "number", &value.span, tokens),
-        _ => collect_value(source, value, tokens),
+        Value::Word(_) => push_span("handler", &value.span, tokens),
+        Value::Boolean(_) => push_span("keyword", &value.span, tokens),
+        Value::String(_) => push_span("string", &value.span, tokens),
+        Value::Int(_) | Value::Float(_) => push_span("number", &value.span, tokens),
+        _ => collect_value(value, tokens),
     }
 }
 
-fn collect_predicate(
-    source: &str,
-    predicate: &Spanned<komrad_core::Predicate>,
-    tokens: &mut Vec<HighlightToken>,
-) {
+fn collect_predicate(predicate: &Spanned<komrad_core::Predicate>, tokens: &mut TokenSink<'_>) {
     match &*predicate.value {
         komrad_core::Predicate::Value(Value::Boolean(_)) => {
-            push_span(source, "predicate.keyword", &predicate.span, tokens);
+            push_span("predicate.keyword", &predicate.span, tokens);
         }
         komrad_core::Predicate::Value(Value::Int(_) | Value::Float(_)) => {
-            push_span(source, "predicate.number", &predicate.span, tokens);
+            push_span("predicate.number", &predicate.span, tokens);
         }
         komrad_core::Predicate::Value(Value::String(_)) => {
-            push_span(source, "predicate.string", &predicate.span, tokens);
+            push_span("predicate.string", &predicate.span, tokens);
         }
         komrad_core::Predicate::Value(Value::Word(_)) => {
-            push_span(source, "handler", &predicate.span, tokens);
+            push_span("handler", &predicate.span, tokens);
         }
         komrad_core::Predicate::Variable(_) => {
-            push_span(source, "predicate.variable", &predicate.span, tokens);
+            push_span("predicate.variable", &predicate.span, tokens);
         }
         komrad_core::Predicate::BinaryExpr { lhs, op, rhs } => {
-            collect_predicate(source, lhs, tokens);
-            push_span(source, "predicate.operator", &op.span, tokens);
-            collect_predicate(source, rhs, tokens);
+            collect_predicate(lhs, tokens);
+            push_span("predicate.operator", &op.span, tokens);
+            collect_predicate(rhs, tokens);
         }
         komrad_core::Predicate::Value(_) => {}
     }
 }
 
-fn collect_operator(source: &str, op: &Spanned<Operator>, tokens: &mut Vec<HighlightToken>) {
-    push_span(source, "operator", &op.span, tokens);
+fn collect_operator(op: &Spanned<Operator>, tokens: &mut TokenSink<'_>) {
+    push_span("operator", &op.span, tokens);
 }
 
-fn push_assignment_operator(
-    source: &str,
-    target_span: &Span,
-    value_span: &Span,
-    tokens: &mut Vec<HighlightToken>,
-) {
+fn push_assignment_operator(target_span: &Span, value_span: &Span, tokens: &mut TokenSink<'_>) {
     if target_span.file_id != value_span.file_id || target_span.end > value_span.start {
         return;
     }
 
+    let source = tokens.source();
     let gap = &source[target_span.end..value_span.start];
     if let Some(relative_start) = gap.find('=') {
         let start = target_span.end + relative_start;
-        push_range(source, "operator", start, start + 1, tokens);
+        tokens.push_range("operator", start, start + 1);
     }
 }
 
-fn push_handler_delimiters(
-    source: &str,
-    statement_span: &Span,
-    pattern_span: &Span,
-    tokens: &mut Vec<HighlightToken>,
-) {
-    push_char_before(
-        source,
+fn push_handler_delimiters(statement_span: &Span, pattern_span: &Span, tokens: &mut TokenSink<'_>) {
+    tokens.push_char_before(
         "punctuation.bracket",
         '[',
         pattern_span.start,
         statement_span.start,
-        tokens,
     );
-    push_char_after(
-        source,
+    tokens.push_char_after(
         "punctuation.bracket",
         ']',
         pattern_span.end,
         statement_span.end,
-        tokens,
     );
 }
 
-fn push_block_braces(source: &str, block_span: &Span, tokens: &mut Vec<HighlightToken>) {
-    push_char_at_or_after(
-        source,
-        "punctuation.bracket",
-        '{',
-        block_span.start,
-        block_span.end,
-        tokens,
-    );
-    push_char_before(
-        source,
-        "punctuation.bracket",
-        '}',
-        block_span.end,
-        block_span.start,
-        tokens,
-    );
+fn push_block_braces(block_span: &Span, tokens: &mut TokenSink<'_>) {
+    tokens.push_char_at_or_after("punctuation.bracket", '{', block_span.start, block_span.end);
+    tokens.push_char_before("punctuation.bracket", '}', block_span.end, block_span.start);
 }
 
-fn push_capture_prefix(source: &str, capture_span: &Span, tokens: &mut Vec<HighlightToken>) {
-    push_char_at_or_before(
-        source,
+fn push_capture_prefix(capture_span: &Span, tokens: &mut TokenSink<'_>) {
+    tokens.push_char_at_or_before(
         "punctuation.delimiter",
         '_',
         capture_span.start,
-        tokens,
+        capture_span.start.saturating_sub(1),
     );
 }
 
-fn push_capture_name(
-    source: &str,
-    capture: &str,
-    capture_span: &Span,
-    tokens: &mut Vec<HighlightToken>,
-) {
+fn push_capture_name(capture: &str, capture_span: &Span, tokens: &mut TokenSink<'_>) {
+    let source = tokens.source();
     let mut start = capture_span.start;
     let mut end = capture_span.end;
 
@@ -481,146 +405,33 @@ fn push_capture_name(
         end -= 1;
     }
 
-    push_range(source, capture, start, end, tokens);
+    tokens.push_range(capture, start, end);
 }
 
-fn push_block_capture_delimiters(
-    source: &str,
-    capture_span: &Span,
-    tokens: &mut Vec<HighlightToken>,
-) {
-    push_char_before(
-        source,
-        "punctuation.delimiter",
-        '_',
-        capture_span.start,
-        0,
-        tokens,
-    );
-    push_char_before(
-        source,
-        "punctuation.bracket",
-        '{',
-        capture_span.start,
-        0,
-        tokens,
-    );
-    push_char_after(
-        source,
+fn push_block_capture_delimiters(capture_span: &Span, tokens: &mut TokenSink<'_>) {
+    tokens.push_char_before("punctuation.delimiter", '_', capture_span.start, 0);
+    tokens.push_char_before("punctuation.bracket", '{', capture_span.start, 0);
+    tokens.push_char_after(
         "punctuation.bracket",
         '}',
         capture_span.end,
-        source.len(),
-        tokens,
+        tokens.source().len(),
     );
 }
 
-fn push_predicate_capture_delimiters(
-    source: &str,
-    predicate_span: &Span,
-    tokens: &mut Vec<HighlightToken>,
-) {
-    push_char_before(
-        source,
-        "punctuation.delimiter",
-        '_',
-        predicate_span.start,
-        0,
-        tokens,
-    );
-    push_char_before(
-        source,
-        "punctuation.bracket",
-        '(',
-        predicate_span.start,
-        0,
-        tokens,
-    );
-    push_char_after(
-        source,
+fn push_predicate_capture_delimiters(predicate_span: &Span, tokens: &mut TokenSink<'_>) {
+    tokens.push_char_before("punctuation.delimiter", '_', predicate_span.start, 0);
+    tokens.push_char_before("punctuation.bracket", '(', predicate_span.start, 0);
+    tokens.push_char_after(
         "punctuation.bracket",
         ')',
         predicate_span.end,
-        source.len(),
-        tokens,
+        tokens.source().len(),
     );
 }
 
-fn push_char_at_or_before(
-    source: &str,
-    capture: &str,
-    needle: char,
-    end: usize,
-    tokens: &mut Vec<HighlightToken>,
-) {
-    if source[end..].starts_with(needle) {
-        push_range(source, capture, end, end + needle.len_utf8(), tokens);
-        return;
-    }
-    push_char_before(source, capture, needle, end, end.saturating_sub(1), tokens);
-}
-
-fn push_char_before(
-    source: &str,
-    capture: &str,
-    needle: char,
-    end: usize,
-    floor: usize,
-    tokens: &mut Vec<HighlightToken>,
-) {
-    let floor = floor.min(end);
-    for (relative_index, ch) in source[floor..end].char_indices().rev() {
-        if ch == needle {
-            let start = floor + relative_index;
-            push_range(source, capture, start, start + ch.len_utf8(), tokens);
-            return;
-        }
-        if !ch.is_whitespace() {
-            return;
-        }
-    }
-}
-
-fn push_char_at_or_after(
-    source: &str,
-    capture: &str,
-    needle: char,
-    start: usize,
-    ceiling: usize,
-    tokens: &mut Vec<HighlightToken>,
-) {
-    push_char_after(source, capture, needle, start, ceiling, tokens);
-}
-
-fn push_char_after(
-    source: &str,
-    capture: &str,
-    needle: char,
-    start: usize,
-    ceiling: usize,
-    tokens: &mut Vec<HighlightToken>,
-) {
-    let ceiling = ceiling.min(source.len());
-    for (relative_index, ch) in source[start..ceiling].char_indices() {
-        if ch == needle {
-            let token_start = start + relative_index;
-            push_range(
-                source,
-                capture,
-                token_start,
-                token_start + ch.len_utf8(),
-                tokens,
-            );
-            return;
-        }
-        if !ch.is_whitespace() {
-            return;
-        }
-    }
-}
-
-fn push_span(source: &str, capture: &str, span: &Span, tokens: &mut Vec<HighlightToken>) {
-    push_range(source, capture, span.start, span.end, tokens);
+fn push_span(capture: &str, span: &Span, tokens: &mut TokenSink<'_>) {
+    tokens.push_range(capture, span.start, span.end);
 }
 
 fn skip_ascii_whitespace(source: &str, start: usize) -> usize {
@@ -716,34 +527,31 @@ fn matching_close_brace(source: &str, open: usize) -> Option<usize> {
     None
 }
 
-fn push_range(
-    source: &str,
-    capture: &str,
-    start: usize,
-    end: usize,
-    tokens: &mut Vec<HighlightToken>,
-) {
-    if start < end && end <= source.len() {
-        tokens.push(token_from_byte_range(source, capture, start, end));
-    }
-}
-
-fn sort_and_dedupe(tokens: &mut Vec<HighlightToken>) {
-    tokens.sort_by(|left, right| {
-        (left.start, left.end, left.capture.as_str()).cmp(&(
-            right.start,
-            right.end,
-            right.capture.as_str(),
-        ))
-    });
-    tokens.dedup_by(|left, right| {
-        left.start == right.start && left.end == right.end && left.capture == right.capture
-    });
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const ALICE: &str = include_str!("../../../examples/alice.kom");
+    const BOB: &str = include_str!("../../../examples/bob.kom");
+    const ALICE_BOB: &str = include_str!("../../../examples/alice-bob.kom");
+
+    #[test]
+    fn parses_representative_examples_into_highlight_tokens() {
+        for source in [ALICE, BOB, ALICE_BOB] {
+            let tokens = parse_tokens(source).expect("example should parse");
+
+            assert!(
+                tokens.iter().any(|token| token.capture == "symbol"),
+                "expected symbol capture in {source}"
+            );
+            assert!(
+                tokens
+                    .iter()
+                    .any(|token| token.capture == "handler" || token.capture == "string"),
+                "expected handler or string capture in {source}"
+            );
+        }
+    }
 
     #[test]
     fn parses_official_komrad_into_highlight_tokens() {

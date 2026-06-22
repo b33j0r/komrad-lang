@@ -1594,7 +1594,7 @@ dependencies = [
 [[package]]
 name = "palimpsest"
 version = "0.1.0"
-source = "git+https://github.com/b33j0r/palimpsest.git#0e0994ae787fd989092abc17faead66f800ebdcf"
+source = "git+https://github.com/b33j0r/palimpsest.git#830d5221a427d836f42a1c7f1cec3a2723fc9ab4"
 dependencies = [
  "pest",
  "serde",
